@@ -222,7 +222,7 @@ async function getNextSerial() {
 /* ======================
    COMPONENT
    ====================== */
-export default function QuotationOnePage() {
+export default function Quotation() {
   const [form] = Form.useForm();
 
   // vehicle data
