@@ -21,7 +21,7 @@ const ENTRY = {
 };
 
 // Optional global counter source (keep empty to use localStorage)
-const RESPONSES_CSV_URL = "";
+const RESPONSES_CSV_URL = "https://docs.google.com/spreadsheets/d/1rixyR0jTU4Uc4pwj_9G7AhDUVpqIOW7_F8zrCJPrJWI/edit?usp=sharing";
 
 /* ======================
    GOOGLE SHEETS (VEHICLE DATA) CSV LOADER
