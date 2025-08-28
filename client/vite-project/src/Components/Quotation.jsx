@@ -1,5 +1,5 @@
 // QuotationOnePage.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Row, Col, Form, Input, InputNumber, Select, Button, Radio, message, Checkbox, Switch,
 } from "antd";
@@ -242,13 +242,24 @@ export default function Quotation() {
   const [mode, setMode] = useState("cash");
   const [downPayment, setDownPayment] = useState(0);
 
-  // vehicle type → fittings (with your default ticks)
+  // vehicle type → fittings
   const [vehicleType, setVehicleType] = useState("scooter");
   const [fittings, setFittings] = useState(["Side Stand", "Floor Mat", "ISI Helmet"]); // default for scooter
   const [docsReq, setDocsReq] = useState(DOCS_REQUIRED);
 
   // executive (watch)
   const executiveName = Form.useWatch("executive", form) || EXECUTIVES[0].name;
+
+  // print fit refs/state
+  const sheetRef = useRef(null);
+  const printDate = useMemo(() => {
+    // dd/mm/yyyy
+    const d = new Date();
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }, []);
 
   // Load vehicle data
   useEffect(() => {
@@ -284,7 +295,7 @@ export default function Quotation() {
     })();
   }, [form]);
 
-  // Vehicle type change → apply your default ticks
+  // Vehicle type change → default ticks
   useEffect(() => {
     if (vehicleType === "scooter") {
       setFittings(["Side Stand", "Floor Mat", "ISI Helmet"]);
@@ -333,16 +344,49 @@ export default function Quotation() {
     return months > 0 ? total / months : 0;
   };
 
-  // PRINT
+  // --- PRINT (force single A4 page) ---
   const handlePrint = async () => {
     try {
       await form.validateFields([
         "serialNo", "name", "mobile", "address",
         "company", "bikeModel", "variant", "onRoadPrice",
       ]);
-      window.print();
     } catch {
       message.warning("Fix the highlighted fields before printing.");
+      return;
+    }
+
+    // Target max printable content height for A4 (portrait) with @page { margin: 10mm; }
+    // A4 full height ≈ 297mm. With 10mm margins top & bottom => 277mm content height.
+    const MAX_HEIGHT_PX = Math.round((277 / 25.4) * 96); // ≈ 1046px at 96 DPI CSS
+    const sheet = sheetRef.current;
+    if (sheet) {
+      // Reset any previous scaling
+      sheet.style.transform = "none";
+      sheet.style.transformOrigin = "top left";
+
+      const contentHeight = sheet.scrollHeight;
+      const scale = Math.min(1, MAX_HEIGHT_PX / contentHeight);
+
+      // Apply scale only if needed
+      if (scale < 1) {
+        sheet.style.transform = `scale(${scale})`;
+        // Expand the box height so the scaled content occupies one page area
+        sheet.style.height = `${Math.ceil( (277 / scale) )}mm`;
+      } else {
+        sheet.style.height = "auto";
+      }
+
+      // Print
+      window.print();
+
+      // Clean up styles after print
+      setTimeout(() => {
+        sheet.style.transform = "none";
+        sheet.style.height = "auto";
+      }, 50);
+    } else {
+      window.print();
     }
   };
 
@@ -362,12 +406,11 @@ export default function Quotation() {
     const entries = toEntries(v, executiveName);
     submitToGoogleForm(entries);
 
-    return v; // no toast here (WhatsApp flow decides)
+    return v; // (WhatsApp flow handles toast)
   };
 
   // WHATSAPP → Save silently, then send details to 9731366921
   const handleWhatsApp = async () => {
-    // Ensure minimal fields for the admin message
     try {
       await form.validateFields(["name", "mobile", "company", "bikeModel", "variant"]);
     } catch {
@@ -375,16 +418,14 @@ export default function Quotation() {
       return;
     }
 
-    // 1) Save to sheet silently
     let savedOk = true;
     try {
       await handleSaveToForm();
     } catch (err) {
-      savedOk = false; // still proceed to WhatsApp send
+      savedOk = false;
       console.warn("Silent save failed (continuing to WhatsApp):", err);
     }
 
-    // 2) Send admin WhatsApp
     const customerName = (form.getFieldValue("name") || "").trim();
     const mobileRaw = form.getFieldValue("mobile");
     const e164 = toE164India(mobileRaw);
@@ -426,15 +467,41 @@ export default function Quotation() {
         .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; }
 
         @media print {
-          @page { size: A4 portrait; margin: 10mm; }
+         @page { size: A4 portrait; margin: 10mm; }
+
+  /* Print only the sheet */
+  body * { visibility: hidden; }
+  .print-sheet, .print-sheet * { visibility: visible !important; }
+  .print-sheet { position: static; margin: 0; padding: 0; }
+
+  /* Single container that must not break */
+  .sheet {
+    width: 190mm;               /* 210 - 10 - 10 */
+    max-height: 277mm;          /* 297 - 10 - 10 */
+    font: 11pt/1.28 "Helvetica Neue", Arial, sans-serif;
+    color: #111;
+    page-break-inside: avoid;
+    page-break-after: avoid;
+    overflow: hidden;           /* prevent spill to page 2 */
+  }
+  .sheet * { page-break-inside: avoid; }
+         
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .no-print { display: none !important; }
+
+          /* Show only the printable sheet */
           body * { visibility: hidden; }
           .print-sheet, .print-sheet * { visibility: visible !important; }
-          .print-sheet { position: static; inset: 0; margin: 0; }
+          .print-sheet { position: absolute; inset: 0; margin: 0; }
+
+          /* A4 content area */
           .sheet { width: 190mm; min-height: 277mm; font: 11pt/1.28 "Helvetica Neue", Arial, sans-serif; color: #111; }
-          .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
-          .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px 12px; }
+
+          /* Avoid breaking the sheet */
+          .sheet, .sheet * { page-break-inside: avoid; }
+
+          .row2 { display: grid; grid-template-columns: 0.5fr 1fr; gap: 6px 12px; }
+          .row3 { display: grid; grid-template-columns: 0.5fr 0.5fr 1fr; gap: 10px 20px; }
           .box { border: 1.6px solid #000; border-radius: 6px; padding: 6px 8px; }
           .plist { margin: 0; padding-left: 18px; }
           .plist li { margin: 0 0 2px; }
@@ -665,37 +732,43 @@ export default function Quotation() {
       </div>
 
       {/* ---------- PRINT SLIP (A4) ---------- */}
-      <div className="print-sheet">
-        <div style={{ borderBottom: "2px solid #000", paddingBottom: 6, marginBottom: 8, textAlign: "center" }}>
-          <div className="quo-box" style={{ margin: "0 auto 8px auto" }}>QUOTATION</div>
+     {/* ---------- PRINT SLIP (A4) ---------- */}
+<div className="print-sheet">
+  <div className="sheet" ref={sheetRef}>
+    {/* Top banner INSIDE the sheet now */}
+    <div className="top-banner" style={{ borderBottom: "2px solid #000", paddingBottom: 6, marginBottom: 8, textAlign: "center" }}>
+      <div className="quo-box" style={{ margin: "0 auto 8px auto" }}>QUOTATION</div>
+    </div>
+
+    <div style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "start", borderBottom: "2px solid #000", paddingBottom: 6, marginBottom: 8 }}>
+      <div>
+        <div className="title-kn">ಶಾಂತ ಮೋಟರ್ಸ್</div>
+        <div className="title-en">Shantha Motors</div>
+
+        <div style={{ marginTop: 6 }}>
+          <div className="addr-line">• No.195, Opp. to Muddanna Ceramics, Ullal Main Road, Gidadakonenahalli, Bangalore - 560091</div>
+          <div className="addr-line">• No.1, Opp to Udupi Garden Hotel, D Group Arch, Andrahalli Main Road, Bangalore - 560091</div>
+          <div className="addr-line">• Hegganahalli, Besides Anjaneya Temple, Hegganahalli Main Road, Bangalore - 560091</div>
+          <div className="addr-line">• Tavarekere, Besides Poorvika Electronics, Magadi Main Road, Bangalore - 562130</div>
+          <div className="addr-line">• No. 34/1, Opp. Saritha Bar, Channenahalli, Magadi Main Road, Bangalore - 562130</div>
+          <div className="addr-line">• Kadabagere, Besides SBI Bank, Magadi Main Road, Bangalore - 562130</div>
+          <div className="addr-line">• Opp. Lense Cart, D Group Layout, Gidadakonenahalli, Bangalore - 560091</div>
         </div>
+      </div>
 
-        <div className="sheet">
-          <div style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "start", borderBottom: "2px solid #000", paddingBottom: 6, marginBottom: 8 }}>
-            <div>
-              <div className="title-kn">ಶಾಂತ ಮೋಟರ್ಸ್</div>
-              <div className="title-en">Shantha Motors</div>
+      <div style={{ textAlign: "right" }}>
+        <div style={{ fontWeight: 300, marginTop: 6 }}>
+          Sl. No.: {form.getFieldValue("serialNo") || "-"}
+        </div>
+        {/* Date below Serial No. */}
+        <div style={{ fontWeight: 300, marginTop: 2 }}>
+          Date: {printDate}
+        </div>
+        <img src="/shantha-logo.png" alt="Shantha Motors Logo" style={{ height: 130, margin: "6px 0" }} />
+        <div style={{ fontWeight: 500, marginTop: 6 }}>Mob No: 9731366921</div>
+      </div>
+    </div>
 
-              <div style={{ marginTop: 6 }}>
-                <div className="addr-line">• No.195, Opp. to Muddanna Ceramics, Ullal Main Road, Gidadakonenahalli, Bangalore - 560091</div>
-                <div className="addr-line">• No.1, Opp to Udupi Garden Hotel, D Group Arch, Andrahalli Main Road, Bangalore - 560091</div>
-                <div className="addr-line">• Hegganahalli, Besides Anjaneya Temple, Hegganahalli Main Road, Bangalore - 560091</div>
-                <div className="addr-line">• Hegganahalli, Besides Anjaneya Temple, Hegganahalli Main Road, Bangalore - 560091</div>
-                <div className="addr-line">• Tavarekere, Besides Poorvika Electronics, Magadi Main Road, Bangalore - 562130</div>
-                <div className="addr-line">• No. 34/1, Opp. Saritha Bar, Channenahalli, Magadi Main Road, Bangalore - 562130</div>
-                <div className="addr-line">• Kadabagere, Besides SBI Bank, Magadi Main Road, Bangalore - 562130</div>
-                <div className="addr-line">• Opp. Lense Cart, D Group Layout, Gidadakonenahalli, Bangalore - 560091</div>
-              </div>
-            </div>
-
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontWeight: 300, marginTop: 6 }}>
-                Sl. No.: {form.getFieldValue("serialNo") || "-"}
-              </div>
-              <img src="/shantha-logo.png" alt="Shantha Motors Logo" style={{ height: 150, marginBottom: 6 }} />
-              <div style={{ fontWeight: 300, marginTop: 6 }}>Mob No: 9731366921</div>
-            </div>
-          </div>
 
           {/* Customer Box */}
           <div className="box" style={{ marginBottom: 8 }}>
