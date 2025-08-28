@@ -92,11 +92,17 @@ const RATE_HIGH = 11;        // DP < 30%
 const TENURES = [18, 24, 30, 36];
 
 const EXECUTIVES = [
-  { name: "Rukmini", phone: "9876543210" },
-  { name: "Radha", phone: "9123456789" },
-  { name: "Manasa", phone: "9988776655" },
-  { name: "Karthik", phone: "9090909090" },
-  { name: "Suresh", phone: "9876501234" },
+  { name: "Rukmini", phone: "9901678562" },
+  { name: "Meghana", phone: "7019974219" },
+  { name: "Nikitha", phone: "9535190015" },
+  { name: "Prakash", phone: "9740176476" },
+  { name: "Kumar", phone: "7975807667" },
+  { name: "Sujay", phone: "7022878048" },
+  { name: "Kavi", phone: "9108970455" },
+  { name: "Narasimha", phone: "9900887666" },
+  { name: "Kavya", phone: "8073165374" },
+  { name: "Shubha", phone: "8971585057" },
+  { name: "Vanitha", phone: "9380729861" },
 ];
 
 // Your requested fittings
