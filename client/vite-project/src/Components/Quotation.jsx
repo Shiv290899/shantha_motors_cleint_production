@@ -431,7 +431,7 @@ export default function Quotation() {
           .no-print { display: none !important; }
           body * { visibility: hidden; }
           .print-sheet, .print-sheet * { visibility: visible !important; }
-          .print-sheet { position: absolute; inset: 0; margin: 0; }
+          .print-sheet { position: static; inset: 0; margin: 0; }
           .sheet { width: 190mm; min-height: 277mm; font: 11pt/1.28 "Helvetica Neue", Arial, sans-serif; color: #111; }
           .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
           .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px 12px; }
