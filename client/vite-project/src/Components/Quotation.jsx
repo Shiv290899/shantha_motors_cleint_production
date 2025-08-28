@@ -26,8 +26,8 @@ const RESPONSES_CSV_URL = "";
 /* ======================
    GOOGLE SHEETS (VEHICLE DATA) CSV LOADER
    ====================== */
-const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQsXcqX5kmqG1uKHuWUnBCjMXBugJn7xljgBsRPIm2gkk2PpyRnEp8koausqNflt6Q4Gnqjczva82oN/pub?output=csv'
-  const HEADERS = {
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQsXcqX5kmqG1uKHuWUnBCjMXBugJn7xljgBsRPIm2gkk2PpyRnEp8koausqNflt6Q4Gnqjczva82oN/pub?output=csv";
+const HEADERS = {
   company: ["Company", "Company Name"],
   model: ["Model", "Model Name"],
   variant: ["Variant"],
@@ -105,7 +105,7 @@ const EXECUTIVES = [
   { name: "Vanitha", phone: "9380729861" },
 ];
 
-// Your requested fittings
+// Fittings
 const SCOOTER_OPTIONS = [
   "All Round Guard",
   "Side Stand",
@@ -156,9 +156,6 @@ const toE164India = (raw) => {
   if (noLeadZero.startsWith("91") && noLeadZero.length === 12) return noLeadZero;
   return noLeadZero;
 };
-
-// Prefilled link (not used now, per request)
-
 
 // Silent submit to Google Form
 const submitToGoogleForm = (entries) => {
@@ -354,7 +351,7 @@ export default function Quotation() {
   const handleSaveToForm = async () => {
     const v = await form.validateFields([
       "serialNo", "name", "mobile", "address",
-      "company", "bikeModel", "variant", "onRoadPrice", "remarks", "executive",
+      "company", "bikeModel", "variant", "onRoadPrice", "executive",
     ]);
 
     if (!v.serialNo) {
@@ -369,7 +366,7 @@ export default function Quotation() {
     return v; // no toast here (WhatsApp flow decides)
   };
 
-  // WHATSAPP → Save silently, then send details to 9731366291
+  // WHATSAPP → Save silently, then send details to 9731366921
   const handleWhatsApp = async () => {
     // Ensure minimal fields for the admin message
     try {
@@ -402,11 +399,10 @@ export default function Quotation() {
       `\nMobile: ${e164 ? "+" + e164 : (mobileRaw || "-")}` +
       `\nVehicle: ${[companyVal, modelVal, variantVal].filter(Boolean).join(" ") || "-"}`;
 
-    const adminNumber = "919731366921"; 
+    const adminNumber = "919731366921"; // +91 9731366921
     const url = `https://wa.me/${adminNumber}?text=${encodeURIComponent(adminMsg)}`;
     window.open(url, "_blank");
 
-    // Give user feedback about save
     if (savedOk) {
       message.success("Saved to sheet and opened WhatsApp with details.");
     } else {
@@ -420,7 +416,6 @@ export default function Quotation() {
     return <ul className="plist">{items.map((t) => <li key={t}>{t}</li>)}</ul>;
   };
 
-  // dynamic fittings list per vehicle type
   const currentFittingOptions =
     vehicleType === "scooter" ? SCOOTER_OPTIONS : MOTORCYCLE_OPTIONS;
 
@@ -645,9 +640,15 @@ export default function Quotation() {
                 </Form.Item>
               </Col>
 
+              {/* Remarks (optional) */}
+              <Col xs={24}>
+                <Form.Item label="Remarks" name="remarks">
+                  <Input.TextArea rows={2} placeholder="Any notes for this quotation (optional)" />
+                </Form.Item>
+              </Col>
+
               {/* Actions */}
               <Col span={24} style={{ textAlign: "right" }}>
-                {/* Removed Open Form (Prefilled) + Save buttons per your request */}
                 <Button
                   className="no-print"
                   onClick={handleWhatsApp}
@@ -693,7 +694,7 @@ export default function Quotation() {
                 Sl. No.: {form.getFieldValue("serialNo") || "-"}
               </div>
               <img src="/shantha-logo.png" alt="Shantha Motors Logo" style={{ height: 150, marginBottom: 6 }} />
-              <div style={{ fontWeight: 300, marginTop: 6 }}>Mob No: 9731366291</div>
+              <div style={{ fontWeight: 300, marginTop: 6 }}>Mob No: 9731366921</div>
             </div>
           </div>
 
@@ -749,14 +750,9 @@ export default function Quotation() {
               })()}
             </div>
 
-            <div style={{ marginBottom: 6 }}>
-              <b>Remarks:</b> {form.getFieldValue("remarks") || "-"}
-            </div>
-
             <div className="row3">
               <div>
                 <div style={{ fontWeight: 700, marginBottom: 4 }}>Free Extra Fittings</div>
-                {/* Only selected fittings printed */}
                 <PrintList items={fittings} />
               </div>
               <div>
