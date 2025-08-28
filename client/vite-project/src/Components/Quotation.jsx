@@ -26,8 +26,8 @@ const RESPONSES_CSV_URL = "";
 /* ======================
    GOOGLE SHEETS (VEHICLE DATA) CSV LOADER
    ====================== */
-const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQsXcqX5kmqG1uKHuWUnBCjMXBugJn7xljgBsRPIm2gkk2PpyRnEp8koausqNflt6Q4Gnqjczva82oN/pubhtml"
-const HEADERS = {
+const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQsXcqX5kmqG1uKHuWUnBCjMXBugJn7xljgBsRPIm2gkk2PpyRnEp8koausqNflt6Q4Gnqjczva82oN/pub?output=csv'
+  const HEADERS = {
   company: ["Company", "Company Name"],
   model: ["Model", "Model Name"],
   variant: ["Variant"],
