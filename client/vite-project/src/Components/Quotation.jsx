@@ -350,7 +350,7 @@ export default function Quotation() {
   const handleSaveToForm = async () => {
     const v = await form.validateFields([
       "serialNo", "name", "mobile", "address",
-      "company", "bikeModel", "variant", "onRoadPrice", "executive",
+      "company", "bikeModel", "variant", "onRoadPrice", "executive", 'remarks',
     ]);
 
     if (!v.serialNo) {
