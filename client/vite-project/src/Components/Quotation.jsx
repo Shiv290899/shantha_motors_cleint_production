@@ -21,7 +21,8 @@ const ENTRY = {
 };
 
 // Optional global counter source (keep empty to use localStorage)
-const RESPONSES_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRXJ4xTMWJVv7v-U9SD8R5X2z4Lt0EBUeOOo6_leF-75-gToGJV1yxBk3YUooCtMAJ410quZN7UrhnO/pub?output=csv'
+const RESPONSES_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRXJ4xTMWJVv7v-U9SD8R5X2z4Lt0EBUeOOo6_leF-75-gToGJV1yxBk3YUooCtMAJ410quZN7UrhnO/pub?output=csv';
+
 /* ======================
    GOOGLE SHEETS (VEHICLE DATA) CSV LOADER
    ====================== */
@@ -88,7 +89,6 @@ const normalizeSheetRow = (row = {}) => ({
 const PROCESSING_FEE = 8000; // included in principal
 const RATE_LOW = 9;          // DP ≥ 30%
 const RATE_HIGH = 11;        // DP < 30%
-const TENURES = [18, 24, 30, 36];
 
 const EXECUTIVES = [
   { name: "Rukmini", phone: "9901678562" },
@@ -227,6 +227,9 @@ async function getNextSerial() {
 export default function Quotation() {
   const [form] = Form.useForm();
 
+  // brand selector (top)
+  const [brand, setBrand] = useState("SHANTHA"); // "SHANTHA" | "NH"
+
   // vehicle data
   const [bikeData, setBikeData] = useState([]);
   const [company, setCompany] = useState("");
@@ -240,6 +243,14 @@ export default function Quotation() {
 
   // mode + dp
   const [mode, setMode] = useState("cash");
+
+  // EMI set selector for Loan
+  const [emiSet, setEmiSet] = useState("12"); // "12" -> [18,24,30], "48" -> [24,30,36,48]
+  const tenures = useMemo(
+    () => (emiSet === "12" ? [12, 18, 24, 30] : [24, 30, 36, 48]),
+    [emiSet]
+  );
+
   const [downPayment, setDownPayment] = useState(0);
 
   // vehicle type → fittings
@@ -253,7 +264,6 @@ export default function Quotation() {
   // print fit refs/state
   const sheetRef = useRef(null);
   const printDate = useMemo(() => {
-    // dd/mm/yyyy
     const d = new Date();
     const dd = String(d.getDate()).padStart(2, "0");
     const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -344,7 +354,7 @@ export default function Quotation() {
     return months > 0 ? total / months : 0;
   };
 
-  // --- PRINT (force single A4 page) ---
+  // --- PRINT (open a clean window with ONLY the sheet, auto-scale to A4) ---
   const handlePrint = async () => {
     try {
       await form.validateFields([
@@ -356,38 +366,97 @@ export default function Quotation() {
       return;
     }
 
-    // Target max printable content height for A4 (portrait) with @page { margin: 10mm; }
-    // A4 full height ≈ 297mm. With 10mm margins top & bottom => 277mm content height.
-    const MAX_HEIGHT_PX = Math.round((277 / 25.4) * 96); // ≈ 1046px at 96 DPI CSS
     const sheet = sheetRef.current;
-    if (sheet) {
-      // Reset any previous scaling
-      sheet.style.transform = "none";
-      sheet.style.transformOrigin = "top left";
-
-      const contentHeight = sheet.scrollHeight;
-      const scale = Math.min(1, MAX_HEIGHT_PX / contentHeight);
-
-      // Apply scale only if needed
-      if (scale < 1) {
-        sheet.style.transform = `scale(${scale})`;
-        // Expand the box height so the scaled content occupies one page area
-        sheet.style.height = `${Math.ceil( (277 / scale) )}mm`;
-      } else {
-        sheet.style.height = "auto";
-      }
-
-      // Print
+    if (!sheet) {
       window.print();
-
-      // Clean up styles after print
-      setTimeout(() => {
-        sheet.style.transform = "none";
-        sheet.style.height = "auto";
-      }, 50);
-    } else {
-      window.print();
+      return;
     }
+
+    // Clone the current sheet DOM (keeps the rendered values)
+    const cloned = sheet.cloneNode(true);
+
+    // Compute scale so it fits A4 height (usable ~277mm with 12mm margins)
+    const MAX_HEIGHT_PX = Math.round((277 / 25.4) * 96); // ≈ 1046px @96DPI
+    // Temporarily put the clone offscreen to measure accurate height
+    cloned.style.position = "absolute";
+    cloned.style.left = "-99999px";
+    cloned.style.top = "0";
+    cloned.style.transform = "none";
+    document.body.appendChild(cloned);
+    const contentHeight = cloned.scrollHeight;
+    document.body.removeChild(cloned);
+    const scale = Math.min(1, MAX_HEIGHT_PX / Math.max(1, contentHeight));
+
+    // Open a clean print window
+    const win = window.open("", "PRINT", "width=1024,height=768");
+    if (!win) {
+      message.error("Pop-up blocked. Please allow pop-ups for printing.");
+      return;
+    }
+
+    // Minimal, self-contained print CSS for that window
+    const PRINT_STYLES = `
+      @page { size: A4 portrait; margin: 12mm; }
+      html, body { margin: 0; padding: 0; }
+      .print-wrap { margin: 0 auto; }
+      .sheet {
+        width: 186mm;                /* guttered width to avoid edge clipping */
+        font: 12pt/1.32 "Helvetica Neue", Arial, sans-serif;
+        color: #111;
+        box-sizing: border-box;
+        transform-origin: top left;
+        overflow: visible !important; /* never clip content */
+      }
+      .row2 { display: grid; grid-template-columns: 0.8fr 1.4fr; gap: 8px 16px; }
+      .row3 { display: grid; grid-template-columns: 0.5fr 0.8fr 1fr; gap: 10px 16px; }
+      .box { border: 2px solid #000; border-radius: 6px; padding: 8px 10px; }
+      .plist { margin: 0; padding-left: 18px; }
+      .plist li { margin: 0 0 2px; }
+      .title-knhonda { font-size: 25pt; font-weight: 900; letter-spacing: .2px; }
+      .title-kn { font-size: 30pt; font-weight: 900; letter-spacing: .2px; }
+      .title-en { font-size: 20pt; font-weight: 800; margin-top: 2px; }
+      .big-price { font-size: 16pt; font-weight: 900; }
+      .addr-line { font-size: 10pt; }
+      .quo-box { font-size: 17pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; position: absolute; left: 50%; transform: translateX(-50%); }
+      .hdr-line { position: relative; display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px; }
+      .hdr-centre { text-align:center; font-weight:600; }
+      .hdr-right { margin-left: auto; text-align:right; font-weight:600; }
+      .emibox { border: 2px solid #000; border-radius: 8px; padding: 6px 10px; text-align: center; }
+      .section-title { font-size: 14pt; font-weight: 900; margin-bottom: 4px; }
+      img { max-width: 100%; height: auto; }
+    `;
+
+    // Build a minimal HTML doc containing ONLY the sheet
+    const doc = win.document;
+    doc.open();
+    doc.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8"/>
+          <title>Quotation</title>
+          <style>${PRINT_STYLES}</style>
+        </head>
+        <body>
+          <div class="print-wrap">${sheet.outerHTML}</div>
+          <script>
+            (function(){
+              var sheet = document.querySelector('.sheet');
+              if (sheet) {
+                var scale = ${Number(scale).toFixed(4)};
+                if (scale < 1) { sheet.style.transform = 'scale(' + scale + ')'; }
+              }
+              // Give images/fonts a tick to load before printing
+              setTimeout(function(){
+                window.print();
+                setTimeout(function(){ window.close(); }, 100);
+              }, 50);
+            })();
+          </script>
+        </body>
+      </html>
+    `);
+    doc.close();
   };
 
   // SAVE → GOOGLE FORM (silent)
@@ -406,10 +475,10 @@ export default function Quotation() {
     const entries = toEntries(v, executiveName);
     submitToGoogleForm(entries);
 
-    return v; // (WhatsApp flow handles toast)
+    return v;
   };
 
-  // WHATSAPP → Save silently, then send details to 9731366921
+  // WHATSAPP → Save silently, then send details to admin number
   const handleWhatsApp = async () => {
     try {
       await form.validateFields(["name", "mobile", "company", "bikeModel", "variant"]);
@@ -461,56 +530,10 @@ export default function Quotation() {
 
   return (
     <>
-      {/* ====== Screen & Print styles ====== */}
+      {/* ====== Screen styles only (no print special rules needed now) ====== */}
       <style>{`
         .wrap { max-width: 1000px; margin: 12px auto; padding: 0 12px; }
         .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; }
-
-        @media print {
-         @page { size: A4 portrait; margin: 10mm; }
-
-  /* Print only the sheet */
-  body * { visibility: hidden; }
-  .print-sheet, .print-sheet * { visibility: visible !important; }
-  .print-sheet { position: static; margin: 0; padding: 0; }
-
-  /* Single container that must not break */
-  .sheet {
-    width: 190mm;               /* 210 - 10 - 10 */
-    max-height: 277mm;          /* 297 - 10 - 10 */
-    font: 11pt/1.28 "Helvetica Neue", Arial, sans-serif;
-    color: #111;
-    page-break-inside: avoid;
-    page-break-after: avoid;
-    overflow: hidden;           /* prevent spill to page 2 */
-  }
-  .sheet * { page-break-inside: avoid; }
-         
-          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .no-print { display: none !important; }
-
-          /* Show only the printable sheet */
-          body * { visibility: hidden; }
-          .print-sheet, .print-sheet * { visibility: visible !important; }
-          .print-sheet { position: absolute; inset: 0; margin: 0; }
-
-          /* A4 content area */
-          .sheet { width: 190mm; min-height: 277mm; font: 11pt/1.28 "Helvetica Neue", Arial, sans-serif; color: #111; }
-
-          /* Avoid breaking the sheet */
-          .sheet, .sheet * { page-break-inside: avoid; }
-
-          .row2 { display: grid; grid-template-columns: 0.5fr 1fr; gap: 6px 12px; }
-          .row3 { display: grid; grid-template-columns: 0.5fr 0.5fr 1fr; gap: 10px 20px; }
-          .box { border: 1.6px solid #000; border-radius: 6px; padding: 6px 8px; }
-          .plist { margin: 0; padding-left: 18px; }
-          .plist li { margin: 0 0 2px; }
-          .title-kn { font-size: 30pt; font-weight: 900; letter-spacing: .3px; }
-          .title-en { font-size: 20pt; font-weight: 700; margin-top: 2px; }
-          .big-price { font-size: 14pt; font-weight: 900; }
-          .addr-line { font-size: 9.5pt; }
-          .quo-box { border: 2px solid #000; padding: 4px 8px; font-weight: 800; display: inline-block; }
-        }
       `}</style>
 
       {/* ---------- On-screen inputs ---------- */}
@@ -522,6 +545,17 @@ export default function Quotation() {
             initialValues={{ executive: EXECUTIVES[0].name }}
           >
             <Row gutter={[12, 8]}>
+
+              {/* ===== Brand selector (TOP) ===== */}
+              <Col span={24}>
+                <Form.Item label="Brand on Print">
+                  <Radio.Group value={brand} onChange={(e)=>setBrand(e.target.value)}>
+                    <Radio value="SHANTHA">Shantha Motors</Radio>
+                    <Radio value="NH">NH Motors (Honda)</Radio>
+                  </Radio.Group>
+                </Form.Item>
+              </Col>
+
               {/* Manual entry toggle */}
               <Col span={24}>
                 <Form.Item label="Type manually (no sheet)" valuePropName="checked">
@@ -647,20 +681,43 @@ export default function Quotation() {
               </Col>
 
               {mode === "loan" && (
-                <Col xs={24} md={12}>
-                  <Form.Item label="Down Payment (₹)">
-                    <InputNumber
-                      style={{ width: "100%" }}
-                      min={0}
-                      max={onRoadPrice}
-                      step={1000}
-                      value={downPayment}
-                      onChange={(v) => setDownPayment(Math.min(Number(v || 0), onRoadPrice || 0))}
-                      formatter={(val) => `₹ ${String(val ?? "0").replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`}
-                      parser={(val) => String(val || "0").replace(/[₹,\s]/g, "")}
-                    />
-                  </Form.Item>
-                </Col>
+                <>
+                  <Col xs={24} md={12}>
+                    <Form.Item label="Down Payment (₹)">
+                      <InputNumber
+                        style={{ width: "100%" }}
+                        min={0}
+                        max={onRoadPrice}
+                        step={1000}
+                        value={downPayment}
+                        onChange={(v) => setDownPayment(Math.min(Number(v || 0), onRoadPrice || 0))}
+                        formatter={(val) => `₹ ${String(val ?? "0").replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`}
+                        parser={(val) => String(val || "0").replace(/[₹,\s]/g, "")}
+                      />
+                    </Form.Item>
+                  </Col>
+
+                  {/* EMI set chooser & live EMI cards on FORM */}
+                  <Col xs={24}>
+                    <Form.Item label="EMI Set">
+                      <Radio.Group value={emiSet} onChange={(e)=>setEmiSet(e.target.value)}>
+                        <Radio value="12">12</Radio>
+                        <Radio value="48">48</Radio>
+                      </Radio.Group>
+                    </Form.Item>
+                  </Col>
+
+                  <Col xs={24}>
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                      {tenures.map((mo) => (
+                        <div key={mo} className="emibox" style={{ minWidth: 140 }}>
+                          <div style={{ fontWeight: 700 }}>{mo} months</div>
+                          <div style={{ fontWeight: 900, fontSize: 16 }}>{inr0(monthlyFor(mo))}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </Col>
+                </>
               )}
 
               {/* Vehicle Type & Fittings with ticks */}
@@ -732,47 +789,75 @@ export default function Quotation() {
       </div>
 
       {/* ---------- PRINT SLIP (A4) ---------- */}
-     {/* ---------- PRINT SLIP (A4) ---------- */}
-<div className="print-sheet">
-  <div className="sheet" ref={sheetRef}>
-    {/* Top banner INSIDE the sheet now */}
-    <div className="top-banner" style={{ borderBottom: "2px solid #000", paddingBottom: 6, marginBottom: 8, textAlign: "center" }}>
-      <div className="quo-box" style={{ margin: "0 auto 8px auto" }}>QUOTATION</div>
-    </div>
+      <div className="print-sheet">
+        <div className="sheet" ref={sheetRef}>
 
-    <div style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "start", borderBottom: "2px solid #000", paddingBottom: 6, marginBottom: 8 }}>
-      <div>
-        <div className="title-kn">ಶಾಂತ ಮೋಟರ್ಸ್</div>
-        <div className="title-en">Shantha Motors</div>
+          {/* Header row: QUOTATION (left) + Serial/Date (right) */}
+          <div className="hdr-line" >
+            <div className="quo-box">QUOTATION</div>
+            <div className="hdr-right">
+              <div>Sl. No.: {form.getFieldValue("serialNo") || "-"}</div>
+              <div>Date: {printDate}</div>
+            </div>
+          </div>
 
-        <div style={{ marginTop: 6 }}>
-          <div className="addr-line">• No.195, Opp. to Muddanna Ceramics, Ullal Main Road, Gidadakonenahalli, Bangalore - 560091</div>
-          <div className="addr-line">• No.1, Opp to Udupi Garden Hotel, D Group Arch, Andrahalli Main Road, Bangalore - 560091</div>
-          <div className="addr-line">• Hegganahalli, Besides Anjaneya Temple, Hegganahalli Main Road, Bangalore - 560091</div>
-          <div className="addr-line">• Tavarekere, Besides Poorvika Electronics, Magadi Main Road, Bangalore - 562130</div>
-          <div className="addr-line">• No. 34/1, Opp. Saritha Bar, Channenahalli, Magadi Main Road, Bangalore - 562130</div>
-          <div className="addr-line">• Kadabagere, Besides SBI Bank, Magadi Main Road, Bangalore - 562130</div>
-          <div className="addr-line">• Opp. Lense Cart, D Group Layout, Gidadakonenahalli, Bangalore - 560091</div>
-        </div>
-      </div>
+          {/* Brand block */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", borderBottom: "2px solid #000", paddingBottom: 6, marginBottom: 8 }}>
+            <div>
+              {brand === "SHANTHA" ? (
+                <>
+                  <div className="title-kn">ಶಾಂತ ಮೋಟರ್ಸ್</div>
+                  <div className="title-en">Shantha Motors</div>
 
-      <div style={{ textAlign: "right" }}>
-        <div style={{ fontWeight: 300, marginTop: 6 }}>
-          Sl. No.: {form.getFieldValue("serialNo") || "-"}
-        </div>
-        {/* Date below Serial No. */}
-        <div style={{ fontWeight: 300, marginTop: 2 }}>
-          Date: {printDate}
-        </div>
-        <img src="/shantha-logo.png" alt="Shantha Motors Logo" style={{ height: 130, margin: "6px 0" }} />
-        <div style={{ fontWeight: 500, marginTop: 6 }}>Mob No: 9731366921</div>
-      </div>
-    </div>
+                  <div style={{ marginTop: 6 }}>
+                    <div className="addr-line">• Kadabagere, Besides SBI Bank, Magadi Main Road, Bangalore - 562130</div>
+                    <div className="addr-line">• No.195, Opp. to Muddanna Ceramics, Ullal Main Road, Bangalore - 560091</div>
+                    <div className="addr-line">• Opp. Lense Cart, D - Group Layout, Gidadakonenahalli, Bangalore - 560091</div>
+                    <div className="addr-line">• No.1, Opp to Udupi Garden Hotel, Andrahalli Main Road, Bangalore - 560091</div>
+                    <div className="addr-line">• Tavarekere, Besides Poorvika Elect., Magadi Main Road, Bangalore - 562130</div>
+                    <div className="addr-line">• Hegganahalli, Anjaneya Temple, Hegganahalli Main Road, Bangalore - 560091</div>
+                    <div className="addr-line">• No.34/1,Opp.Saritha Bar,Channenahalli,Magadi Main Road, Bangalore - 562130</div>
+                    <div className="addr-line">• Nelagadrahalli andralli Main road, nr St Joseph's College Bangalore -560073</div>
+                  </div>
+                  <div style={{ marginTop: 6, fontWeight: 600 }}>
+                    Mob: 9731366921 / 8073283502 / 9035131806
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="title-row">
+                    <div className="title-knhonda">ಎನ್ ಎಚ್ ಮೋಟರ್ಸ್</div>
+                    <div className="title-en">NH Motors</div>
+                  </div>
+                  <div style={{ marginTop: 6 }}>
+                    <div className="addr-line">
+                      Site No. 116/1, Bydarahalli, Magadi Main Road, Opp. HP Petrol Bunk,
+                      Bangalore - 560091
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 6, fontWeight: 600 }}>
+                    Mob: 9731366921 / 8073283502 / 9741609799
+                  </div>
+                </>
+              )}
+            </div>
 
+            <div style={{ textAlign: "right" }}>
+              <img
+                src={brand === "SHANTHA" ? "/shantha-logo.png" : "/honda-logo.png"}
+                alt="Brand Logo"
+                style={{
+                  height: brand === "SHANTHA" ? "200px" : "120px",
+                  margin: "6px 0",
+                  objectFit: "contain"
+                }}
+              />
+            </div>
+          </div>
 
           {/* Customer Box */}
           <div className="box" style={{ marginBottom: 8 }}>
-            <div style={{ fontWeight: 700, marginBottom: 4 }}>Customer Details</div>
+            <div className="section-title">Customer Details</div>
             <div className="row2">
               <div><b>Name:</b> {form.getFieldValue("name") || "-"}</div>
               <div><b>Mobile:</b> {form.getFieldValue("mobile") || "-"}</div>
@@ -782,8 +867,8 @@ export default function Quotation() {
 
           {/* Vehicle Box */}
           <div className="box" style={{ marginBottom: 8 }}>
-            <div style={{ fontWeight: 700, marginBottom: 4 }}>Vehicle Details</div>
-            <div className="row3">
+            <div className="section-title">Vehicle Details</div>
+            <div className="row3" style={{ fontSize: "13pt" }}>
               <div><b>Company:</b> {company || form.getFieldValue("company") || "-"}</div>
               <div><b>Model:</b> {model || form.getFieldValue("bikeModel") || "-"}</div>
               <div><b>Variant:</b> {variant || form.getFieldValue("variant") || "-"}</div>
@@ -796,23 +881,31 @@ export default function Quotation() {
             </div>
           </div>
 
-          {/* Loan/EMI Box */}
+          {/* Down Payment + EMI DETAILS */}
           {mode === "loan" && (
             <div className="box" style={{ marginBottom: 8 }}>
-              <div style={{ fontWeight: 700, marginBottom: 4 }}>Loan Details – EMI DETAILS</div>
-              <div style={{ marginBottom: 6 }}><b>Down Payment:</b> {inr0(downPayment || 0)}</div>
-              <div style={{ display: "flex", gap: "8px", justifyContent: "space-between" }}>
-                {TENURES.map((mo) => (
-                  <div key={mo} style={{ flex: 1, border: "1px solid #000", borderRadius: 6, padding: "6px 8px", textAlign: "center" }}>
-                    <div style={{ fontWeight: 600 }}>{mo} months</div>
-                    <div style={{ fontWeight: 800 }}>{inr0(monthlyFor(mo))}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 12, alignItems: "start" }}>
+                <div>
+                  <div style={{ fontWeight: 700, marginBottom: 4, fontSize: "12pt" }}>Down Payment</div>
+                  <div style={{ fontWeight: 800, fontSize: "14pt" }}>{inr0(downPayment || 0)}</div>
+                </div>
+
+                <div>
+                  <div style={{ fontWeight: 900, textAlign: "center", marginBottom: 4, fontSize: "14pt" }}>EMI DETAILS</div>
+                  <div style={{ display: "flex", gap: 8, justifyContent: "space-between", flexWrap: "wrap" }}>
+                    {tenures.map((mo) => (
+                      <div key={mo} className="emibox" style={{ flex: 1, minWidth: 120 }}>
+                        <div style={{ fontWeight: 700 }}>{mo} months</div>
+                        <div style={{ fontWeight: 900 }}>{inr0(monthlyFor(mo))}</div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
               </div>
             </div>
           )}
 
-          {/* Executive, Remarks, Fittings & Documents */}
+          {/* Executive + Fittings + Image + Documents */}
           <div className="box" style={{ marginBottom: 8 }}>
             <div style={{ marginBottom: 6 }}>
               <b>Executive name:</b> {executiveName || "-"}
@@ -822,21 +915,31 @@ export default function Quotation() {
               })()}
             </div>
 
-            <div className="row3">
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, alignItems: "start" }}>
               <div>
                 <div style={{ fontWeight: 700, marginBottom: 4 }}>Free Extra Fittings</div>
                 <PrintList items={fittings} />
               </div>
-              <div>
-                <div style={{ fontWeight: 700, marginBottom: 4 }}>Documents Required</div>
-                <PrintList items={docsReq} />
+
+              <div style={{ minHeight: 120, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600 }}>
+                <img
+                  src="/shantha-access.png"
+                  alt="Accessories"
+                  style={{ height: 140, margin: "6px 0" }}
+                />
               </div>
-              <div />
+
+              <div>
+                <div style={{ fontWeight: 700, marginBottom: 4, textAlign: "right" }}>Documents Required</div>
+                <div style={{ textAlign: "right" }}>
+                  <PrintList items={docsReq} />
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Footer note */}
-          <div style={{ fontSize: "9pt", display: "flex", justifyContent: "space-between" }}>
+          <div style={{ fontSize: "9.5pt", display: "flex", justifyContent: "space-between" }}>
             <div />
             <div><b>Note:</b> Prices are indicative and subject to change without prior notice.</div>
           </div>
