@@ -355,109 +355,157 @@ export default function Quotation() {
   };
 
   // --- PRINT (open a clean window with ONLY the sheet, auto-scale to A4) ---
-  const handlePrint = async () => {
-    try {
-      await form.validateFields([
-        "serialNo", "name", "mobile", "address",
-        "company", "bikeModel", "variant", "onRoadPrice",
-      ]);
-    } catch {
-      message.warning("Fix the highlighted fields before printing.");
-      return;
+  // --- PRINT (A4, mobile-safe via hidden iframe) ---
+const handlePrint = async () => {
+  try {
+    await form.validateFields([
+      "serialNo", "name", "mobile", "address",
+      "company", "bikeModel", "variant", "onRoadPrice",
+    ]);
+  } catch {
+    message.warning("Fix the highlighted fields before printing.");
+    return;
+  }
+
+  const sheet = sheetRef.current;
+  if (!sheet) {
+    // Fallback: current page print
+    window.print();
+    return;
+  }
+
+  // Clone the current sheet DOM (keeps the rendered values)
+  const cloned = sheet.cloneNode(true);
+
+  // Measure natural height (offscreen)
+  const probe = cloned.cloneNode(true);
+  probe.style.position = "absolute";
+  probe.style.left = "-99999px";
+  probe.style.top = "0";
+  probe.style.transform = "none";
+  document.body.appendChild(probe);
+  const contentHeight = probe.scrollHeight;
+  document.body.removeChild(probe);
+
+  // Compute scale so it fits A4 height (usable ~277mm with 12mm margins)
+  const MAX_HEIGHT_PX = Math.round((277 / 25.4) * 96); // ≈ 1046px @96DPI
+  const scale = Math.min(1, MAX_HEIGHT_PX / Math.max(1, contentHeight));
+
+  // Minimal, self-contained print CSS (same as before)
+  const PRINT_STYLES = `
+    @page { size: A4 portrait; margin: 12mm; }
+    html, body { margin: 0; padding: 0; }
+    .print-wrap { margin: 0 auto; }
+    .sheet {
+      width: 186mm;                /* guttered width to avoid edge clipping */
+      font: 12pt/1.32 "Helvetica Neue", Arial, sans-serif;
+      color: #111;
+      box-sizing: border-box;
+      transform-origin: top left;
+      overflow: visible !important; /* never clip content */
     }
+    .row2 { display: grid; grid-template-columns: 0.8fr 1.4fr; gap: 8px 16px; }
+    .row3 { display: grid; grid-template-columns: 0.5fr 0.8fr 1fr; gap: 10px 16px; }
+    .box { border: 2px solid #000; border-radius: 6px; padding: 8px 10px; }
+    .plist { margin: 0; padding-left: 18px; }
+    .plist li { margin: 0 0 2px; }
+    .title-knhonda { font-size: 25pt; font-weight: 900; letter-spacing: .2px; }
+    .title-kn { font-size: 30pt; font-weight: 900; letter-spacing: .2px; }
+    .title-en { font-size: 20pt; font-weight: 800; margin-top: 2px; }
+    .big-price { font-size: 16pt; font-weight: 900; }
+    .addr-line { font-size: 10pt; }
+    .quo-box { font-size: 17pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; position: absolute; left: 50%; transform: translateX(-50%); }
+    .hdr-line { position: relative; display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px; }
+    .hdr-centre { text-align:center; font-weight:600; }
+    .hdr-right { margin-left: auto; text-align:right; font-weight:600; }
+    .emibox { border: 2px solid #000; border-radius: 8px; padding: 6px 10px; text-align: center; }
+    .section-title { font-size: 14pt; font-weight: 900; margin-bottom: 4px; }
+    img { max-width: 100%; height: auto; }
+  `;
 
-    const sheet = sheetRef.current;
-    if (!sheet) {
-      window.print();
-      return;
-    }
+  // Create hidden iframe
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  iframe.setAttribute("aria-hidden", "true");
+  document.body.appendChild(iframe);
 
-    // Clone the current sheet DOM (keeps the rendered values)
-    const cloned = sheet.cloneNode(true);
+  const win = iframe.contentWindow;
+  const doc = win.document;
 
-    // Compute scale so it fits A4 height (usable ~277mm with 12mm margins)
-    const MAX_HEIGHT_PX = Math.round((277 / 25.4) * 96); // ≈ 1046px @96DPI
-    // Temporarily put the clone offscreen to measure accurate height
-    cloned.style.position = "absolute";
-    cloned.style.left = "-99999px";
-    cloned.style.top = "0";
-    cloned.style.transform = "none";
-    document.body.appendChild(cloned);
-    const contentHeight = cloned.scrollHeight;
-    document.body.removeChild(cloned);
-    const scale = Math.min(1, MAX_HEIGHT_PX / Math.max(1, contentHeight));
+  // Build minimal print document inside the iframe
+  doc.open();
+  doc.write(`
+    <!doctype html>
+    <html>
+    <head>
+      <meta charset="utf-8"/>
+      <title>Quotation</title>
+      <style>${PRINT_STYLES}</style>
+    </head>
+    <body>
+      <div class="print-wrap"></div>
+    </body>
+    </html>
+  `);
+  doc.close();
 
-    // Open a clean print window
-    const win = window.open("", "PRINT", "width=1024,height=768");
-    if (!win) {
-      message.error("Pop-up blocked. Please allow pop-ups for printing.");
-      return;
-    }
+  // Inject the cloned sheet
+  const mount = doc.querySelector(".print-wrap");
+  mount.appendChild(cloned);
 
-    // Minimal, self-contained print CSS for that window
-    const PRINT_STYLES = `
-      @page { size: A4 portrait; margin: 12mm; }
-      html, body { margin: 0; padding: 0; }
-      .print-wrap { margin: 0 auto; }
-      .sheet {
-        width: 186mm;                /* guttered width to avoid edge clipping */
-        font: 12pt/1.32 "Helvetica Neue", Arial, sans-serif;
-        color: #111;
-        box-sizing: border-box;
-        transform-origin: top left;
-        overflow: visible !important; /* never clip content */
+  // Apply scale after insertion
+  const sheetEl = doc.querySelector(".sheet");
+  if (sheetEl && scale < 1) {
+    sheetEl.style.transform = `scale(${scale})`;
+  }
+
+  // Helper: wait for all images + fonts
+  const waitForAssets = async () => {
+    const imgs = Array.from(doc.images || []);
+    await Promise.all(
+      imgs.map(img => {
+        if (img.complete && img.naturalWidth) return Promise.resolve();
+        return new Promise(res => {
+          img.onload = img.onerror = () => res();
+        });
+      })
+    );
+    if (doc.fonts && doc.fonts.ready) {
+      try { await doc.fonts.ready; } catch {
+        //ignore
       }
-      .row2 { display: grid; grid-template-columns: 0.8fr 1.4fr; gap: 8px 16px; }
-      .row3 { display: grid; grid-template-columns: 0.5fr 0.8fr 1fr; gap: 10px 16px; }
-      .box { border: 2px solid #000; border-radius: 6px; padding: 8px 10px; }
-      .plist { margin: 0; padding-left: 18px; }
-      .plist li { margin: 0 0 2px; }
-      .title-knhonda { font-size: 25pt; font-weight: 900; letter-spacing: .2px; }
-      .title-kn { font-size: 30pt; font-weight: 900; letter-spacing: .2px; }
-      .title-en { font-size: 20pt; font-weight: 800; margin-top: 2px; }
-      .big-price { font-size: 16pt; font-weight: 900; }
-      .addr-line { font-size: 10pt; }
-      .quo-box { font-size: 17pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; position: absolute; left: 50%; transform: translateX(-50%); }
-      .hdr-line { position: relative; display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px; }
-      .hdr-centre { text-align:center; font-weight:600; }
-      .hdr-right { margin-left: auto; text-align:right; font-weight:600; }
-      .emibox { border: 2px solid #000; border-radius: 8px; padding: 6px 10px; text-align: center; }
-      .section-title { font-size: 14pt; font-weight: 900; margin-bottom: 4px; }
-      img { max-width: 100%; height: auto; }
-    `;
-
-    // Build a minimal HTML doc containing ONLY the sheet
-    const doc = win.document;
-    doc.open();
-    doc.write(`
-      <!doctype html>
-      <html>
-        <head>
-          <meta charset="utf-8"/>
-          <title>Quotation</title>
-          <style>${PRINT_STYLES}</style>
-        </head>
-        <body>
-          <div class="print-wrap">${sheet.outerHTML}</div>
-          <script>
-            (function(){
-              var sheet = document.querySelector('.sheet');
-              if (sheet) {
-                var scale = ${Number(scale).toFixed(4)};
-                if (scale < 1) { sheet.style.transform = 'scale(' + scale + ')'; }
-              }
-              // Give images/fonts a tick to load before printing
-              setTimeout(function(){
-                window.print();
-                setTimeout(function(){ window.close(); }, 100);
-              }, 50);
-            })();
-          </script>
-        </body>
-      </html>
-    `);
-    doc.close();
+    }
   };
+
+  // On some mobiles, printing must happen after a user-gesture tick
+  // and only after the iframe has fully laid out.
+  setTimeout(async () => {
+    try {
+      await waitForAssets();
+    } finally {
+      try { win.focus(); } catch {
+        // ignore
+      }
+      try {
+        // Use iframe's own print — this is the key for mobile reliability
+        win.print();
+      } catch {
+        // Fallback to host window if needed
+        window.print();
+      }
+      // Cleanup after a short delay (let the dialog open)
+      setTimeout(() => {
+        iframe.parentNode && iframe.parentNode.removeChild(iframe);
+      }, 1000);
+    }
+  }, 100);
+};
+
 
   // SAVE → GOOGLE FORM (silent)
   const handleSaveToForm = async () => {
@@ -868,7 +916,7 @@ export default function Quotation() {
           {/* Vehicle Box */}
           <div className="box" style={{ marginBottom: 8 }}>
             <div className="section-title">Vehicle Details</div>
-            <div className="row3" style={{ fontSize: "15pt" }}>
+            <div className="row3" style={{ fontSize: "14pt" }}>
               <div><b>Company:</b> {company || form.getFieldValue("company") || "-"}</div>
               <div><b>Model:</b> {model || form.getFieldValue("bikeModel") || "-"}</div>
               <div><b>Variant:</b> {variant || form.getFieldValue("variant") || "-"}</div>
