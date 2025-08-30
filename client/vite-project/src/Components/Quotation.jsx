@@ -255,7 +255,7 @@ export default function Quotation() {
 
   // vehicle type → fittings
   const [vehicleType, setVehicleType] = useState("scooter");
-  const [fittings, setFittings] = useState(["Side Stand", "Floor Mat", "ISI Helmet"]); // default for scooter
+  const [fittings, setFittings] = useState(["Side Stand", "Floor Mat", "ISI Helmet", "Grip Cover"]); // default for scooter
   const [docsReq, setDocsReq] = useState(DOCS_REQUIRED);
 
   // executive (watch)
@@ -308,7 +308,7 @@ export default function Quotation() {
   // Vehicle type change → default ticks
   useEffect(() => {
     if (vehicleType === "scooter") {
-      setFittings(["Side Stand", "Floor Mat", "ISI Helmet"]);
+      setFittings(["Side Stand", "Floor Mat", "ISI Helmet", "Grip Cover"]);
     } else {
       setFittings(["Tank Cover", "Gripper", "Seat Cover"]);
     }
@@ -810,14 +810,14 @@ export default function Quotation() {
                   <div className="title-en">Shantha Motors</div>
 
                   <div style={{ marginTop: 6 }}>
-                    <div className="addr-line">• Kadabagere, Besides SBI Bank, Magadi Main Road, Bangalore - 562130</div>
-                    <div className="addr-line">• No.195, Opp. to Muddanna Ceramics, Ullal Main Road, Bangalore - 560091</div>
-                    <div className="addr-line">• Opp. Lense Cart, D - Group Layout, Gidadakonenahalli, Bangalore - 560091</div>
+                    <div className="addr-line">• Kadabagere,Besides State Bank India ,Magadi Main Road, Bangalore - 562130</div>
+                    <div className="addr-line">• No.195, Oppsit. to Muddanna Ceramics, Ullal Main Road, Bangalore - 560091</div>
+                    <div className="addr-line">• Opp. Lense Cart, D - Group Layout,  Gidadakonenahalli, Bangalore - 560091</div>
                     <div className="addr-line">• No.1, Opp to Udupi Garden Hotel, Andrahalli Main Road, Bangalore - 560091</div>
                     <div className="addr-line">• Tavarekere, Besides Poorvika Elect., Magadi Main Road, Bangalore - 562130</div>
                     <div className="addr-line">• Hegganahalli, Anjaneya Temple, Hegganahalli Main Road, Bangalore - 560091</div>
-                    <div className="addr-line">• No.34/1,Opp.Saritha Bar,Channenahalli,Magadi Main Road, Bangalore - 562130</div>
-                    <div className="addr-line">• Nelagadrahalli andralli Main road, nr St Joseph's College Bangalore -560073</div>
+                    <div className="addr-line">• No.34/1,Opp.Sarita Bar,Channenahalli,Magadi Main Road, Bangalore - 562130</div>
+                    <div className="addr-line">• No.14,Nelagadrahalli Main road,Nr St Joseph's College, Bangalore - 560073</div>
                   </div>
                   <div style={{ marginTop: 6, fontWeight: 600 }}>
                     Mob: 9731366921 / 8073283502 / 9035131806
@@ -844,10 +844,10 @@ export default function Quotation() {
 
             <div style={{ textAlign: "right" }}>
               <img
-                src={brand === "SHANTHA" ? "/shantha-logo.png" : "/honda-logo.png"}
+                src={brand === "SHANTHA" ? "/shantha-logoprint.png" : "/honda-logo.png"}
                 alt="Brand Logo"
                 style={{
-                  height: brand === "SHANTHA" ? "200px" : "120px",
+                  height: brand === "SHANTHA" ? "190px" : "120px",
                   margin: "6px 0",
                   objectFit: "contain"
                 }}
@@ -868,7 +868,7 @@ export default function Quotation() {
           {/* Vehicle Box */}
           <div className="box" style={{ marginBottom: 8 }}>
             <div className="section-title">Vehicle Details</div>
-            <div className="row3" style={{ fontSize: "13pt" }}>
+            <div className="row3" style={{ fontSize: "15pt" }}>
               <div><b>Company:</b> {company || form.getFieldValue("company") || "-"}</div>
               <div><b>Model:</b> {model || form.getFieldValue("bikeModel") || "-"}</div>
               <div><b>Variant:</b> {variant || form.getFieldValue("variant") || "-"}</div>
