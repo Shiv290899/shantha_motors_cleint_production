@@ -411,10 +411,10 @@ export default function Quotation() {
       .plist { margin: 0; padding-left: 18px; }
       .plist li { margin: 0 0 2px; }
       .title-knhonda { font-size: 25pt; font-weight: 900; letter-spacing: .2px; }
-      .title-kn { font-size: 30pt; font-weight: 900; letter-spacing: .2px; }
+      .title-kn { font-size: 35pt; font-weight: 900; letter-spacing: .2px; }
       .title-en { font-size: 20pt; font-weight: 800; margin-top: 2px; }
       .big-price { font-size: 16pt; font-weight: 900; }
-      .addr-line { font-size: 10pt; }
+      .addr-line { font-size: 8pt; }
       .quo-box { font-size: 17pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; position: absolute; left: 50%; transform: translateX(-50%); }
       .hdr-line { position: relative; display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px; }
       .hdr-centre { text-align:center; font-weight:600; }
@@ -857,58 +857,84 @@ export default function Quotation() {
           </div>
 
           {/* Brand block */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", borderBottom: "2px solid #000", paddingBottom: 6, marginBottom: 8 }}>
-            <div>
-              {brand === "SHANTHA" ? (
-                <>
-                  <div className="title-kn">ಶಾಂತ ಮೋಟರ್ಸ್</div>
-                  <div className="title-en">Shantha Motors</div>
+         {/* Brand block */}
+<div
+  style={{
+    display: "grid",
+    gridTemplateColumns: "1fr auto auto", // extra column for QR
+    alignItems: "center",
+    borderBottom: "2px solid #000",
+    paddingBottom: 6,
+    marginBottom: 8,
+    gap: 16,
+  }}
+>
+  {/* Left: Titles + Address + Mobile */}
+  <div>
+    {brand === "SHANTHA" ? (
+      <>
+       <div className="title-kn" style={{ whiteSpace: "nowrap" }}>
+  ಶಾಂತ ಮೋಟರ್ಸ್
+</div>
+        <div className="title-en">Shantha Motors</div>
 
-                  <div style={{ marginTop: 6 }}>
-                    <div className="addr-line">• Kadabagere,Besides State Bank India ,Magadi Main Road, Bangalore - 562130</div>
-                    <div className="addr-line">• No.195, Oppsit. to Muddanna Ceramics, Ullal Main Road, Bangalore - 560091</div>
-                    <div className="addr-line">• Opp. Lense Cart, D - Group Layout,  Gidadakonenahalli, Bangalore - 560091</div>
-                    <div className="addr-line">• No.1, Opp to Udupi Garden Hotel, Andrahalli Main Road, Bangalore - 560091</div>
-                    <div className="addr-line">• Tavarekere, Besides Poorvika Elect., Magadi Main Road, Bangalore - 562130</div>
-                    <div className="addr-line">• Hegganahalli, Anjaneya Temple, Hegganahalli Main Road, Bangalore - 560091</div>
-                    <div className="addr-line">• No.34/1,Opp.Sarita Bar,Channenahalli,Magadi Main Road, Bangalore - 562130</div>
-                    <div className="addr-line">• No.14,Nelagadrahalli Main road,Nr St Joseph's College, Bangalore - 560073</div>
-                  </div>
-                  <div style={{ marginTop: 6, fontWeight: 600 }}>
-                    Mob: 9731366921 / 8073283502 / 9035131806
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="title-row">
-                    <div className="title-knhonda">ಎನ್ ಎಚ್ ಮೋಟರ್ಸ್</div>
-                    <div className="title-en">NH Motors</div>
-                  </div>
-                  <div style={{ marginTop: 6 }}>
-                    <div className="addr-line">
-                      Site No. 116/1, Bydarahalli, Magadi Main Road, Opp. HP Petrol Bunk,
-                      Bangalore - 560091
-                    </div>
-                  </div>
-                  <div style={{ marginTop: 6, fontWeight: 600 }}>
-                    Mob: 9731366921 / 8073283502 / 9741609799
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div style={{ textAlign: "right" }}>
-              <img
-                src={brand === "SHANTHA" ? "/shantha-logoprint.png" : "/honda-logo.png"}
-                alt="Brand Logo"
-                style={{
-                  height: brand === "SHANTHA" ? "190px" : "120px",
-                  margin: "6px 0",
-                  objectFit: "contain"
-                }}
-              />
-            </div>
+        <div style={{ marginTop: 6 }}>
+          <div className="addr-line">• Kadabagere,Besides State Bank India ,Magadi Main Road, Bangalore - 562130</div>
+          <div className="addr-line">• No.195, Oppsit. to Muddanna Ceramics, Ullal Main Road, Bangalore - 560091</div>
+          <div className="addr-line">• Opp. Lense Cart, D - Group Layout,  Gidadakonenahalli, Bangalore - 560091</div>
+          <div className="addr-line">• No.1, Opp to Udupi Garden Hotel, Andrahalli Main Road, Bangalore - 560091</div>
+          <div className="addr-line">• Tavarekere, Besides Poorvika Elect., Magadi Main Road, Bangalore - 562130</div>
+          <div className="addr-line">• Hegganahalli, Anjaneya Temple, Hegganahalli Main Road, Bangalore - 560091</div>
+          <div className="addr-line">• No.34/1,Opp.Sarita Bar,Channenahalli,Magadi Main Road, Bangalore - 562130</div>
+          <div className="addr-line">• No.14,Nelagadrahalli Main road,Nr St Joseph's College, Bangalore - 560073</div>
+        </div>
+        <div style={{ marginTop: 6, fontWeight: 600 }}>
+          Mob: 9731366921 / 8073283502 / 9035131806
+        </div>
+      </>
+    ) : (
+      <>
+        <div className="title-row">
+          <div className="title-knhonda">ಎನ್ ಎಚ್ ಮೋಟರ್ಸ್</div>
+          <div className="title-en">NH Motors</div>
+        </div>
+        <div style={{ marginTop: 6 }}>
+          <div className="addr-line">
+            Site No. 116/1, Bydarahalli, Magadi Main Road, Opp. HP Petrol Bunk,
+            Bangalore - 560091
           </div>
+        </div>
+        <div style={{ marginTop: 6, fontWeight: 600 }}>
+          Mob: 9731366921 / 8073283502 / 9741609799
+        </div>
+      </>
+    )}
+  </div>
+
+  {/* Middle: Scanner QR for location */}
+  <div style={{ textAlign: "center" }}>
+    <img
+      src="/location-qr.png"
+      alt="Location QR"
+      style={{ height: "120px", margin: "6px 0", objectFit: "contain" }}
+    />
+    <div style={{ fontSize: 12, fontWeight: 600 }}>Scan for Location</div>
+  </div>
+
+  {/* Right: Brand Logo */}
+  <div style={{ textAlign: "right" }}>
+    <img
+      src={brand === "SHANTHA" ? "/shantha-logoprint.png" : "/honda-logo.png"}
+      alt="Brand Logo"
+      style={{
+        height: brand === "SHANTHA" ? "220px" : "120px",
+        margin: "6px 0",
+        objectFit: "contain",
+      }}
+    />
+  </div>
+</div>
+
 
           {/* Customer Box */}
           <div className="box" style={{ marginBottom: 8 }}>
@@ -942,7 +968,7 @@ export default function Quotation() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 12, alignItems: "start" }}>
                 <div>
                   <div style={{ fontWeight: 700, marginBottom: 4, fontSize: "12pt" }}>Down Payment</div>
-                  <div style={{ fontWeight: 800, fontSize: "14pt" }}>{inr0(downPayment || 0)}</div>
+                  <div style={{ fontWeight: 800, fontSize: "18pt" }}>{inr0(downPayment || 0)}</div>
                 </div>
 
                 <div>
@@ -960,38 +986,54 @@ export default function Quotation() {
             </div>
           )}
 
-          {/* Executive + Fittings + Image + Documents */}
-          <div className="box" style={{ marginBottom: 8 }}>
-            <div style={{ marginBottom: 6 }}>
-              <b>Executive name:</b> {executiveName || "-"}
-              {(() => {
-                const found = EXECUTIVES.find((e) => e.name === executiveName);
-                return found ? ` (${found.phone})` : "";
-              })()}
-            </div>
+       {/* Executive + Fittings + Image + Documents */}
+<div className="box" style={{ marginBottom: 8 }}>
+  <div style={{ marginBottom: 6 }}>
+    <b>Executive name:</b> {executiveName || "-"}
+    {(() => {
+      const found = EXECUTIVES.find((e) => e.name === executiveName);
+      return found ? ` (${found.phone})` : "";
+    })()}
+  </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, alignItems: "start" }}>
-              <div>
-                <div style={{ fontWeight: 700, marginBottom: 4 }}>Free Extra Fittings</div>
-                <PrintList items={fittings} />
-              </div>
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns: "0.6fr 1fr 1fr", // 3 clear columns
+      gap: 16,
+      alignItems: "start",
+    }}
+  >
+    {/* Column 1 → Free Extra Fittings */}
+    <div>
+      <div style={{ fontWeight: 700, marginBottom: 4 }}>Free Extra Fittings</div>
+      <PrintList items={fittings} />
+    </div>
 
-              <div style={{ minHeight: 120, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600 }}>
-                <img
-                  src="/shantha-access.png"
-                  alt="Accessories"
-                  style={{ height: 140, margin: "6px 0" }}
-                />
-              </div>
+    {/* Column 2 → Accessories Image */}
+    <div
+      style={{
+        minHeight: 120,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontWeight: 600,
+      }}
+    >
+      <img
+        src="/shantha-access.png"
+        alt="Accessories"
+        style={{ height: 140, margin: "6px 0" }}
+      />
+    </div>
 
-              <div>
-                <div style={{ fontWeight: 700, marginBottom: 4, textAlign: "right" }}>Documents Required</div>
-                <div style={{ textAlign: "right" }}>
-                  <PrintList items={docsReq} />
-                </div>
-              </div>
-            </div>
-          </div>
+    {/* Column 3 → Documents Required */}
+    <div>
+      <div style={{ fontWeight: 700, marginBottom: 4 }}>Documents Required</div>
+      <PrintList items={docsReq} />
+    </div>
+  </div>
+</div>
 
           {/* Footer note */}
           <div style={{ fontSize: "9.5pt", display: "flex", justifyContent: "space-between" }}>
