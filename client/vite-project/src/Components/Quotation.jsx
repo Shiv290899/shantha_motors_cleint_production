@@ -342,6 +342,7 @@ export default function Quotation() {
 
   // ---------- UPDATED: cross-device single-page consistent print (non-iOS) ----------
   const handlePrint = async () => {
+    
     try {
       await form.validateFields([
         "serialNo", "name", "mobile", "address",
@@ -482,6 +483,23 @@ export default function Quotation() {
       }, 1000);
     }
   };
+  // Capture Ctrl/Cmd + P and route to handlePrint
+useEffect(() => {
+  const onKeyDown = (e) => {
+    // Ctrl+P (Win/Linux/Android/Chromebook) or Cmd+P (macOS)
+    const isPrintShortcut =
+      (e.ctrlKey || e.metaKey) && (e.key === "p" || e.key === "P");
+
+    if (isPrintShortcut) {
+      e.preventDefault();   // stop the browser's default print
+      handlePrint();        // run your single-page print logic
+    }
+  };
+
+  window.addEventListener("keydown", onKeyDown);
+  return () => window.removeEventListener("keydown", onKeyDown);
+}, [handlePrint]);
+
 
   const handleSaveToForm = async () => {
     const v = await form.validateFields([
