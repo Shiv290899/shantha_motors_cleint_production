@@ -7,23 +7,21 @@ import EmiCalculator from "./Components/EmiCalculator";
 import Home from "./Components/Home";
 import Login from "./Components/Login";
 import Register from "./Components/Register";
-import Navbar from "./Components/Navbar"; // ✅ new
+import Navbar from "./Components/Navbar";
 import Quotation from "./Components/Quotation";
 import JobCard from "./Components/JobCard";
 
 function App() {
   return (
     <>
-      <Navbar /> {/* ✅ shown on every page */}
+      <Navbar />
       <Routes>
-        <Route path="/" element={<Home /></Route>} />
+        <Route path="/" element={<Home />} />
         <Route path="/home" element={<Home />} />
-
         <Route path="/login" element={<Login />} />
         <Route path="/quotation" element={<Quotation />} />
         <Route path="/register" element={<Register />} />
         <Route path="/jobcard" element={<JobCard />} />
-
         <Route path="/bookingform" element={<BookingForm />} />
         <Route path="/about" element={<About />} />
         <Route path="/about-us" element={<About />} />
