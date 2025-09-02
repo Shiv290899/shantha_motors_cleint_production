@@ -384,7 +384,7 @@ export default function Quotation() {
       .title-kn { font-size: 38pt; font-weight: 900; letter-spacing: .2px; }
       .title-en { font-size: 20pt; font-weight: 800; margin-top: 2px; }
       .big-price { font-size: 16pt; font-weight: 900; }
-      .addr-line { font-size: 9pt; }
+      .addr-line { font-size: 11pt; }
       .addr-linehonda { font-size: 12pt; }
       .quo-box { font-size: 17pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; position: absolute; left: 50%; transform: translateX(-50%); }
       .hdr-line { position: relative; display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px; }
@@ -836,14 +836,31 @@ useEffect(() => {
       <div className="print-sheet">
         <div className="sheet" ref={sheetRef}>
 
-          {/* Header row: QUOTATION (left) + Serial/Date (right) */}
-          <div className="hdr-line" >
-            <div className="quo-box">QUOTATION</div>
-            <div className="hdr-right">
-              <div>Sl. No.: {form.getFieldValue("serialNo") || "-"}</div>
-              <div>Date: {printDate}</div>
-            </div>
-          </div>
+         {/* Header row: QR (left) + QUOTATION + Serial/Date (right) */}
+<div className="hdr-line" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+  
+  {/* Left QR block */}
+  <div style={{ textAlign: "center", marginRight: 12 }}>
+    <img
+      src="/location-qr.png"
+      alt="Location QR"
+      style={{ height: 50, objectFit: "contain" }}
+    />
+    <div style={{ fontSize: 8, fontWeight: 600, marginTop: 4 }}>Scan for Location</div>
+  </div>
+
+  {/* Center: QUOTATION */}
+  <div className="quo-box" style={{ flex: 1, textAlign: "center" }}>
+    QUOTATION
+  </div>
+
+  {/* Right: Serial + Date */}
+  <div className="hdr-right" style={{ textAlign: "right" }}>
+    <div>Sl. No.: {form.getFieldValue("serialNo") || "-"}</div>
+    <div>Date: {printDate}</div>
+  </div>
+</div>
+
 
           {/* Brand block (two rows): Row1 title; Row2 addresses + (QR + Logo in a row) */}
           <div
@@ -928,7 +945,7 @@ useEffect(() => {
                 )}
               </div>
 
-              {/* Right: QR + Logo row */}
+              {/* Right: Logo row */}
               <div
                 className="brand-right"
                 style={{
@@ -939,19 +956,15 @@ useEffect(() => {
                   justifyContent: "flex-end",
                 }}
               >
-                <div style={{ textAlign: "center" }}>
-                  <img
-                    src="/location-qr.png"
-                    alt="Location QR"
-                    style={{ height: 100, objectFit: "contain" }}
-                  />
-                  <div style={{ fontSize: 10, fontWeight: 600, marginTop: 4 }}>Scan for Location</div>
-                </div>
                 <img
-                  src={brand === "SHANTHA" ? "/shantha-logoprint.png" : "/honda-logo.png"}
-                  alt="Brand Logo"
-                  style={{ height: 140, objectFit: "contain" }}
-                />
+  src={brand === "SHANTHA" ? "/shantha-logoprint.png" : "/honda-logo.png"}
+  alt="Brand Logo"
+  style={{
+    height: brand === "SHANTHA" ? 160 : 120, // different height per logo
+    objectFit: "contain",
+  }}
+/>
+
               </div>
             </div>
           </div>
@@ -969,7 +982,7 @@ useEffect(() => {
           {/* Vehicle Box */}
           <div className="box" style={{ marginBottom: 8 }}>
             <div className="section-title">Vehicle Details</div>
-            <div className="row3" style={{ fontSize: "14pt" }}>
+            <div className="row3" style={{ fontSize: "12pt" }}>
               <div><b>Company:</b> {company || form.getFieldValue("company") || "-"}</div>
               <div><b>Model:</b> {model || form.getFieldValue("bikeModel") || "-"}</div>
               <div><b>Variant:</b> {variant || form.getFieldValue("variant") || "-"}</div>
