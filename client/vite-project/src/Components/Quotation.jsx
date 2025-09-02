@@ -6,22 +6,21 @@ import {
 import { PrinterOutlined } from "@ant-design/icons";
 
 /* ======================
-   GOOGLE FORM INTEGRATION (EDIT THESE)
+   GOOGLE FORM INTEGRATION
    ====================== */
 const GFORM_ID = "1FAIpQLSf12moQr3-6sXFvF4FbA_9h94gwIz-dW_QbT-yFlVsa2wYByg";
 
 const ENTRY = {
-  name: "entry.1495914891",       // Customer Name
-  phone: "entry.606711946",       // Customer Phone
+  name: "entry.1495914891",
+  phone: "entry.606711946",
   company: "entry.561486211",
   model: "entry.772364163",
   variant: "entry.219611581",
-  executive: "entry.1594794173",  // Executive Name
-  remarks: "entry.1055001846",    // Remarks
+  executive: "entry.1594794173",
+  remarks: "entry.1055001846",
 };
 
-// Optional global counter source (keep empty to use localStorage)
-const RESPONSES_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRXJ4xTMWJVv7v-U9SD8R5X2z4Lt0EBUeOOo6_leF-75-gToGJV1yxBk3YUooCtMAJ410quZN7UrhnO/pub?output=csv';
+const RESPONSES_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRXJ4xTMWJVv7v-U9SD8R5X2z4Lt0EBUeOOo6_leF-75-gToGJV1yxBk3YUooCtMAJ410quZN7UrhnO/pub?output=csv";
 
 /* ======================
    GOOGLE SHEETS (VEHICLE DATA) CSV LOADER
@@ -86,9 +85,9 @@ const normalizeSheetRow = (row = {}) => ({
 /* ======================
    CONFIG + STATIC OPTIONS
    ====================== */
-const PROCESSING_FEE = 8000; // included in principal
-const RATE_LOW = 9;          // DP ≥ 30%
-const RATE_HIGH = 11;        // DP < 30%
+const PROCESSING_FEE = 8000;
+const RATE_LOW = 9;
+const RATE_HIGH = 11;
 
 const EXECUTIVES = [
   { name: "Rukmini", phone: "9901678562" },
@@ -104,7 +103,6 @@ const EXECUTIVES = [
   { name: "Vanitha", phone: "9380729861" },
 ];
 
-// Fittings
 const SCOOTER_OPTIONS = [
   "All Round Guard",
   "Side Stand",
@@ -189,7 +187,6 @@ const submitToGoogleForm = (entries) => {
   setTimeout(() => { form.remove(); iframe.remove(); }, 3000);
 };
 
-// Map AntD form values → Google Form entry IDs
 const toEntries = (v, executiveName) => ({
   [ENTRY.name]: v.name ?? "",
   [ENTRY.phone]: v.mobile ?? "",
@@ -210,7 +207,7 @@ async function getNextSerial() {
       if (res.ok) {
         const csv = await res.text();
         const rows = parseCsv(csv);
-        const count = Math.max(0, rows.length - 1); // exclude header
+        const count = Math.max(0, rows.length - 1);
         return String(count + 1);
       }
     } catch { /* fallback */ }
@@ -227,25 +224,20 @@ async function getNextSerial() {
 export default function Quotation() {
   const [form] = Form.useForm();
 
-  // brand selector (top)
   const [brand, setBrand] = useState("SHANTHA"); // "SHANTHA" | "NH"
 
-  // vehicle data
   const [bikeData, setBikeData] = useState([]);
   const [company, setCompany] = useState("");
   const [model, setModel] = useState("");
   const [variant, setVariant] = useState("");
   const [onRoadPrice, setOnRoadPrice] = useState(0);
 
-  // data mode
   const [manual, setManual] = useState(false);
   const [sheetOk, setSheetOk] = useState(false);
 
-  // mode + dp
   const [mode, setMode] = useState("cash");
 
-  // EMI set selector for Loan
-  const [emiSet, setEmiSet] = useState("12"); // "12" -> [18,24,30], "48" -> [24,30,36,48]
+  const [emiSet, setEmiSet] = useState("12"); // "12" or "48"
   const tenures = useMemo(
     () => (emiSet === "12" ? [12, 18, 24, 30] : [24, 30, 36, 48]),
     [emiSet]
@@ -253,15 +245,12 @@ export default function Quotation() {
 
   const [downPayment, setDownPayment] = useState(0);
 
-  // vehicle type → fittings
   const [vehicleType, setVehicleType] = useState("scooter");
-  const [fittings, setFittings] = useState(["Side Stand", "Floor Mat", "ISI Helmet", "Grip Cover"]); // default for scooter
+  const [fittings, setFittings] = useState(["Side Stand", "Floor Mat", "ISI Helmet", "Grip Cover"]);
   const [docsReq, setDocsReq] = useState(DOCS_REQUIRED);
 
-  // executive (watch)
   const executiveName = Form.useWatch("executive", form) || EXECUTIVES[0].name;
 
-  // print fit refs/state
   const sheetRef = useRef(null);
   const printDate = useMemo(() => {
     const d = new Date();
@@ -271,7 +260,6 @@ export default function Quotation() {
     return `${dd}/${mm}/${yyyy}`;
   }, []);
 
-  // Load vehicle data
   useEffect(() => {
     (async () => {
       try {
@@ -295,7 +283,6 @@ export default function Quotation() {
     })();
   }, []);
 
-  // Default quotation number
   useEffect(() => {
     (async () => {
       const serial = await getNextSerial();
@@ -305,7 +292,6 @@ export default function Quotation() {
     })();
   }, [form]);
 
-  // Vehicle type change → default ticks
   useEffect(() => {
     if (vehicleType === "scooter") {
       setFittings(["Side Stand", "Floor Mat", "ISI Helmet", "Grip Cover"]);
@@ -354,7 +340,7 @@ export default function Quotation() {
     return months > 0 ? total / months : 0;
   };
 
-  // --- PRINT (A4, mobile-safe via hidden iframe) ---
+  // ---------- UPDATED: cross-device single-page consistent print (non-iOS) ----------
   const handlePrint = async () => {
     try {
       await form.validateFields([
@@ -368,42 +354,25 @@ export default function Quotation() {
 
     const sheet = sheetRef.current;
     if (!sheet) {
-      // Fallback: current page print
       window.print();
       return;
     }
 
-    // Clone the current sheet DOM (keeps the rendered values)
     const cloned = sheet.cloneNode(true);
 
-    // Measure natural height (offscreen)
-    const probe = cloned.cloneNode(true);
-    probe.style.position = "absolute";
-    probe.style.left = "-99999px";
-    probe.style.top = "0";
-    probe.style.transform = "none";
-    document.body.appendChild(probe);
-    const contentHeight = probe.scrollHeight;
-    document.body.removeChild(probe);
-
-    // Compute scale so it fits A4 height (usable ~277mm with 12mm margins)
-    const MAX_HEIGHT_PX = Math.round((277 / 25.4) * 96); // ≈ 1046px @96DPI
-    const scale = Math.min(1, MAX_HEIGHT_PX / Math.max(1, contentHeight));
-
-    // Minimal, self-contained print CSS (+ tablet fixes)
     const PRINT_STYLES = `
       @page { size: A4 portrait; margin: 12mm; }
       html, body { margin: 0; padding: 0; }
       .print-wrap { margin: 0 auto; }
       .sheet {
-        width: 186mm;                /* guttered width to avoid edge clipping */
+        width: 186mm;
         font: 12pt/1.32 "Helvetica Neue", Arial, sans-serif;
         color: #111;
         box-sizing: border-box;
         transform-origin: top left;
-        overflow: visible !important; /* never clip content */
-        -webkit-print-color-adjust: exact; print-color-adjust: exact; /* ADD */
-        page-break-inside: avoid; /* ADD */
+        overflow: visible !important;
+        -webkit-print-color-adjust: exact; print-color-adjust: exact;
+        page-break-inside: avoid;
       }
       .row2 { display: grid; grid-template-columns: 0.8fr 1.4fr; gap: 8px 16px; }
       .row3 { display: grid; grid-template-columns: 0.5fr 0.8fr 1fr; gap: 10px 16px; }
@@ -423,12 +392,9 @@ export default function Quotation() {
       .emibox { border: 2px solid #000; border-radius: 8px; padding: 6px 10px; text-align: center; }
       .section-title { font-size: 14pt; font-weight: 900; margin-bottom: 4px; }
       img { max-width: 100%; height: auto; }
-
-      /* ensure screen-only UI hides in print */
-      @media print { .no-print { display: none !important; } } /* ADD */
+      @media print { .no-print { display: none !important; } }
     `;
 
-    // Create hidden iframe
     const iframe = document.createElement("iframe");
     iframe.style.position = "fixed";
     iframe.style.right = "0";
@@ -442,7 +408,6 @@ export default function Quotation() {
     const win = iframe.contentWindow;
     const doc = win.document;
 
-    // Build minimal print document inside the iframe
     doc.open();
     doc.write(`
       <!doctype html>
@@ -459,67 +424,69 @@ export default function Quotation() {
     `);
     doc.close();
 
-    // Inject the cloned sheet
     const mount = doc.querySelector(".print-wrap");
     mount.appendChild(cloned);
 
-    // Apply scale after insertion + set scaled height (tablet pagination fix)
-    const sheetEl = doc.querySelector(".sheet");
-    if (sheetEl) {
-      if (scale < 1) {
-        sheetEl.style.transform = `scale(${scale})`;
-      }
-      // KEY FIX: make the layout height match the scaled height so tablets paginate correctly
-      sheetEl.style.height = `${Math.ceil(contentHeight * (scale || 1))}px`;
-    }
-
-    // Helper: wait for all images + fonts
     const waitForAssets = async () => {
       const imgs = Array.from(doc.images || []);
       await Promise.all(
-        imgs.map(img => {
-          if (img.complete && img.naturalWidth) return Promise.resolve();
-          return new Promise(res => {
-            img.onload = img.onerror = () => res();
-          });
-        })
+        imgs.map(img =>
+          (img.complete && img.naturalWidth)
+            ? Promise.resolve()
+            : new Promise(res => { img.onload = img.onerror = () => res(); })
+        )
       );
-      if (doc.fonts && doc.fonts.ready) {
-        try { await doc.fonts.ready; } catch {
-          //ignore
-        }
-      }
+      if (doc.fonts && doc.fonts.ready) { try { await doc.fonts.ready; } catch {
+        //ignore
+      } }
+      await new Promise(res => setTimeout(res, 0));
     };
 
-    // On some mobiles, printing must happen after a user-gesture tick
-    // and only after the iframe has fully laid out.
-    setTimeout(async () => {
-      try {
-        await waitForAssets();
-      } finally {
-        try { win.focus(); } catch {
-          // ignore
-        }
-        try {
-          // Use iframe's own print — this is the key for mobile reliability
-          win.print();
-        } catch {
-          // Fallback to host window if needed
-          window.print();
-        }
-        // Cleanup after a short delay (let the dialog open)
-        setTimeout(() => {
-          iframe.parentNode && iframe.parentNode.removeChild(iframe);
-        }, 1000);
+    const mmToPx = (mm) => (mm / 25.4) * 96;
+    const usableWidthPx = mmToPx(186);
+    const usableHeightPx = mmToPx(277);
+
+    try {
+      await waitForAssets();
+
+      const sheetEl = doc.querySelector(".sheet");
+      if (!sheetEl) { win.print(); return; }
+
+      sheetEl.style.transform = "none";
+      sheetEl.style.height = "auto";
+
+      const contentWidth = sheetEl.scrollWidth;
+      const contentHeight = sheetEl.scrollHeight;
+
+      const scaleW = usableWidthPx / Math.max(1, contentWidth);
+      const scaleH = usableHeightPx / Math.max(1, contentHeight);
+      const scale = Math.min(1, scaleW, scaleH);
+
+      if (scale < 1) {
+        sheetEl.style.transform = `scale(${scale})`;
+        sheetEl.style.height = `${Math.ceil(contentHeight * scale)}px`;
+        sheetEl.style.overflow = "hidden";
+      } else {
+        sheetEl.style.height = `${contentHeight}px`;
       }
-    }, 100);
+
+      await new Promise(res => setTimeout(res, 50));
+
+      try { win.focus(); } catch {
+        //ignore
+      }
+      try { win.print(); } catch { window.print(); }
+    } finally {
+      setTimeout(() => {
+        iframe.parentNode && iframe.parentNode.removeChild(iframe);
+      }, 1000);
+    }
   };
 
-  // SAVE → GOOGLE FORM (silent)
   const handleSaveToForm = async () => {
     const v = await form.validateFields([
       "serialNo", "name", "mobile", "address",
-      "company", "bikeModel", "variant", "onRoadPrice", "executive", 'remarks',
+      "company", "bikeModel", "variant", "onRoadPrice", "executive", "remarks",
     ]);
 
     if (!v.serialNo) {
@@ -534,7 +501,6 @@ export default function Quotation() {
     return v;
   };
 
-  // WHATSAPP → Save silently, then send details to admin number
   const handleWhatsApp = async () => {
     try {
       await form.validateFields(["name", "mobile", "company", "bikeModel", "variant"]);
@@ -564,7 +530,7 @@ export default function Quotation() {
       `\nMobile: ${e164 ? "+" + e164 : (mobileRaw || "-")}` +
       `\nVehicle: ${[companyVal, modelVal, variantVal].filter(Boolean).join(" ") || "-"}`;
 
-    const adminNumber = "919731366921"; // +91 9731366921
+    const adminNumber = "919731366921";
     const url = `https://wa.me/${adminNumber}?text=${encodeURIComponent(adminMsg)}`;
     window.open(url, "_blank");
 
@@ -575,7 +541,6 @@ export default function Quotation() {
     }
   };
 
-  // ------- UI -------
   const PrintList = ({ items }) => {
     if (!items?.length) return <span>-</span>;
     return <ul className="plist">{items.map((t) => <li key={t}>{t}</li>)}</ul>;
@@ -586,13 +551,21 @@ export default function Quotation() {
 
   return (
     <>
-      {/* ====== Screen styles only (no print special rules needed now) ====== */}
+      {/* Screen-only styles */}
       <style>{`
         .wrap { max-width: 1000px; margin: 12px auto; padding: 0 12px; }
         .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; }
+        /* screen-only responsiveness for brand row (does not affect print) */
+        @media screen and (max-width: 600px) {
+          .brand-row2 { grid-template-columns: 1fr !important; row-gap: 8px; }
+          .brand-right { justify-content: flex-start !important; }
+        }
+        /* hide print area on screen if you prefer */
+        .print-sheet { display: none; }
+        @media print { .print-sheet { display: block; } .no-print { display: none !important; } }
       `}</style>
 
-      {/* ---------- On-screen inputs ---------- */}
+      {/* On-screen inputs */}
       <div className="wrap no-print">
         <div className="card">
           <Form
@@ -602,7 +575,6 @@ export default function Quotation() {
           >
             <Row gutter={[12, 8]}>
 
-              {/* ===== Brand selector (TOP) ===== */}
               <Col span={24}>
                 <Form.Item label="Brand on Print">
                   <Radio.Group value={brand} onChange={(e)=>setBrand(e.target.value)}>
@@ -612,7 +584,6 @@ export default function Quotation() {
                 </Form.Item>
               </Col>
 
-              {/* Manual entry toggle */}
               <Col span={24}>
                 <Form.Item label="Type manually (no sheet)" valuePropName="checked">
                   <Switch checked={manual} onChange={setManual} />
@@ -753,7 +724,6 @@ export default function Quotation() {
                     </Form.Item>
                   </Col>
 
-                  {/* EMI set chooser & live EMI cards on FORM */}
                   <Col xs={24}>
                     <Form.Item label="EMI Set">
                       <Radio.Group value={emiSet} onChange={(e)=>setEmiSet(e.target.value)}>
@@ -776,7 +746,7 @@ export default function Quotation() {
                 </>
               )}
 
-              {/* Vehicle Type & Fittings with ticks */}
+              {/* Vehicle Type & Fittings */}
               <Col xs={24} md={12}>
                 <Form.Item label="Vehicle Type" name="vehicleType">
                   <Radio.Group
@@ -819,7 +789,7 @@ export default function Quotation() {
                 </Form.Item>
               </Col>
 
-              {/* Remarks (optional) */}
+              {/* Remarks */}
               <Col xs={24}>
                 <Form.Item label="Remarks" name="remarks">
                   <Input.TextArea rows={2} placeholder="Any notes for this quotation (optional)" />
@@ -857,119 +827,116 @@ export default function Quotation() {
             </div>
           </div>
 
-{/* Brand block */}
-<div
-  style={{
-    borderBottom: "2px solid #000",
-    paddingBottom: 6,
-    marginBottom: 8,
-    display: "grid",
-    gridTemplateRows: "auto auto", // Row 1: titles, Row 2: addresses + QR/Logo
-    rowGap: 8,
-  }}
->
-  {/* ===== Row 1: Titles (full width, one line) ===== */}
-  <div
-    style={{
-      display: "flex",
-      alignItems: "baseline",
-      gap: 8,
-      whiteSpace: "nowrap",
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-    }}
-  >
-    {brand === "SHANTHA" ? (
-      <>
-        <div className="title-kn" style={{ whiteSpace: "nowrap" }}>
-          ಶಾಂತ ಮೋಟರ್ಸ್
-        </div>
-        <div className="title-en" style={{ whiteSpace: "nowrap" }}>
-          Shantha Motors
-        </div>
-      </>
-    ) : (
-      <>
-        <div className="title-knhonda" style={{ whiteSpace: "nowrap" }}>
-          ಎನ್ ಎಚ್ ಮೋಟರ್ಸ್
-        </div>
-        <div className="title-en" style={{ whiteSpace: "nowrap" }}>
-          NH Motors
-        </div>
-      </>
-    )}
-  </div>
+          {/* Brand block (two rows): Row1 title; Row2 addresses + (QR + Logo in a row) */}
+          <div
+            style={{
+              borderBottom: "2px solid #000",
+              paddingBottom: 6,
+              marginBottom: 8,
+              display: "grid",
+              gridTemplateRows: "auto auto",
+              rowGap: 8,
+            }}
+          >
+            {/* Row 1: Titles on one line */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                gap: 8,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {brand === "SHANTHA" ? (
+                <>
+                  <div className="title-kn" style={{ whiteSpace: "nowrap" }}>
+                    ಶಾಂತ ಮೋಟರ್ಸ್
+                  </div>
+                  <div className="title-en" style={{ whiteSpace: "nowrap" }}>
+                    Shantha Motors
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="title-knhonda" style={{ whiteSpace: "nowrap" }}>
+                    ಎನ್ ಎಚ್ ಮೋಟರ್ಸ್
+                  </div>
+                  <div className="title-en" style={{ whiteSpace: "nowrap" }}>
+                    NH Motors
+                  </div>
+                </>
+              )}
+            </div>
 
-  {/* ===== Row 2: Left (addresses) + Right (QR + Logo in a ROW) ===== */}
-  <div
-    style={{
-      display: "grid",
-      gridTemplateColumns: "1fr auto", // left = addresses, right = QR+Logo row
-      columnGap: 16,
-      alignItems: "start",
-    }}
-  >
-    {/* Left: Addresses + Mobile */}
-    <div>
-      {brand === "SHANTHA" ? (
-        <>
-          <div>
-            <div className="addr-line">• Kadabagere,Beside State Bank India,Magadi Main Road, Bangalore - 562130</div>
-            <div className="addr-line">• No.195, Oppsit.to Muddanna Ceramics, Ullal Main Road, Bangalore - 560091</div>
-            <div className="addr-line">• Oppsit. Lens Cart, D - Group Layout, Gidadakonenahalli, Bangalore - 560091</div>
-            <div className="addr-line">• No.1, Opp to Udupi Garden Hotel,Andrahalli Main Road, Bangalore - 560091</div>
-            <div className="addr-line">• Tavarekere, Besides Poorvika Elect., Magadi Main Road, Bangalore - 562130</div>
-            <div className="addr-line">• Hegganahalli,Anjaneya Temple,Hegganahali Main Road, Bangalore - 560091</div>
-            <div className="addr-line">• No.34/1,Opp.Sarita Bar,Channenahali,Magdi Main Road, Bangalore - 562130</div>
-            <div className="addr-line">• No.14, Nelagadrahalli Main Road,Nr St Joseph's College, Bangalore - 560073</div>
+            {/* Row 2: addresses (left) + QR+Logo (right as row) */}
+            <div
+              className="brand-row2"
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr auto",
+                columnGap: 16,
+                alignItems: "start",
+              }}
+            >
+              {/* Left: Addresses + Mobile */}
+              <div>
+                {brand === "SHANTHA" ? (
+                  <>
+                    <div>
+                      <div className="addr-line">• Kadabagere,Beside State Bank India,Magadi Main Road, Bangalore - 562130</div>
+                      <div className="addr-line">• No.195, Oppsit.to Muddanna Ceramics, Ullal Main Road, Bangalore - 560091</div>
+                      <div className="addr-line">• Oppsit. Lens Cart, D - Group Layout, Gidadakonenahalli, Bangalore - 560091</div>
+                      <div className="addr-line">• No.1, Opp to Udupi Garden Hotel,Andrahalli Main Road, Bangalore - 560091</div>
+                      <div className="addr-line">• Tavarekere, Besides Poorvika Elect., Magadi Main Road, Bangalore - 562130</div>
+                      <div className="addr-line">• Hegganahalli,Anjaneya Temple,Hegganahali Main Road, Bangalore - 560091</div>
+                      <div className="addr-line">• No.34/1,Opp.Sarita Bar,Channenahali,Magdi Main Road, Bangalore - 562130</div>
+                      <div className="addr-line">• No.14,Nelagadrahalli Main Road,Nr St Joseph's College, Bangalore - 560073</div>
+                    </div>
+                    <div style={{ marginTop: 6, fontWeight: 600 }}>
+                      Mob: 9731366921 / 8073283502 / 9035131806
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="addr-linehonda">
+                      Site No. 116/1, Bydarahalli, Magadi Main Road, Opp. HP Petrol Bunk, Bangalore - 560091
+                    </div>
+                    <div style={{ marginTop: 6, fontWeight: 600 }}>
+                      Mob: 9731366921 / 8073283502 / 9741609799
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Right: QR + Logo row */}
+              <div
+                className="brand-right"
+                style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 16,
+                  justifyContent: "flex-end",
+                }}
+              >
+                <div style={{ textAlign: "center" }}>
+                  <img
+                    src="/location-qr.png"
+                    alt="Location QR"
+                    style={{ height: 100, objectFit: "contain" }}
+                  />
+                  <div style={{ fontSize: 10, fontWeight: 600, marginTop: 4 }}>Scan for Location</div>
+                </div>
+                <img
+                  src={brand === "SHANTHA" ? "/shantha-logoprint.png" : "/honda-logo.png"}
+                  alt="Brand Logo"
+                  style={{ height: 140, objectFit: "contain" }}
+                />
+              </div>
+            </div>
           </div>
-          <div style={{ marginTop: 6, fontWeight: 600 }}>
-            Mob: 9731366921 / 8073283502 / 9035131806
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="addr-linehonda">
-            Site No. 116/1, Bydarahalli, Magadi Main Road, Opp. HP Petrol Bunk, Bangalore - 560091
-          </div>
-          <div style={{ marginTop: 6, fontWeight: 600 }}>
-            Mob: 9731366921 / 8073283502 / 9741609799
-          </div>
-        </>
-      )}
-    </div>
-
-    {/* Right: QR + Logo horizontally (ROW) */}
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "row", // row-wise as requested
-        alignItems: "center",
-        gap: 16,
-        justifyContent: "flex-end",
-      }}
-    >
-      {/* QR with caption */}
-      <div style={{ textAlign: "center" }}>
-        <img
-          src="/location-qr.png"
-          alt="Location QR"
-          style={{ height: 100, objectFit: "contain" }}
-        />
-        <div style={{ fontSize: 10, fontWeight: 600, marginTop: 4 }}>Scan for Location</div>
-      </div>
-
-      {/* Brand Logo beside QR */}
-      <img
-        src={brand === "SHANTHA" ? "/shantha-logoprint.png" : "/honda-logo.png"}
-        alt="Brand Logo"
-        style={{ height: 140, objectFit: "contain" }}
-      />
-    </div>
-  </div>
-</div>
-
-
 
           {/* Customer Box */}
           <div className="box" style={{ marginBottom: 8 }}>
@@ -1021,54 +988,54 @@ export default function Quotation() {
             </div>
           )}
 
-       {/* Executive + Fittings + Image + Documents */}
-<div className="box" style={{ marginBottom: 8 }}>
-  <div style={{ marginBottom: 6, fontsize: "13pt", fontWeight: 700 }}>
-    <b>Executive name:</b> {executiveName || "-"}
-    {(() => {
-      const found = EXECUTIVES.find((e) => e.name === executiveName);
-      return found ? ` (${found.phone})` : "";
-    })()}
-  </div>
+          {/* Executive + Fittings + Image + Documents */}
+          <div className="box" style={{ marginBottom: 8 }}>
+            <div style={{ marginBottom: 6, fontSize: "13pt", fontWeight: 700 }}>
+              <b>Executive name:</b> {executiveName || "-"}
+              {(() => {
+                const found = EXECUTIVES.find((e) => e.name === executiveName);
+                return found ? ` (${found.phone})` : "";
+              })()}
+            </div>
 
-  <div
-    style={{
-      display: "grid",
-      gridTemplateColumns: "0.6fr 1fr 1fr", // 3 clear columns
-      gap: 16,
-      alignItems: "start",
-    }}
-  >
-    {/* Column 1 → Free Extra Fittings */}
-    <div>
-      <div style={{ fontWeight: 700, marginBottom: 4 }}>Free Extra Fittings</div>
-      <PrintList items={fittings} />
-    </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "0.6fr 1fr 1fr",
+                gap: 16,
+                alignItems: "start",
+              }}
+            >
+              {/* Column 1 → Free Extra Fittings */}
+              <div>
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>Free Extra Fittings</div>
+                <PrintList items={fittings} />
+              </div>
 
-    {/* Column 2 → Accessories Image */}
-    <div
-      style={{
-        minHeight: 120,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontWeight: 600,
-      }}
-    >
-      <img
-        src="/shantha-access.png"
-        alt="Accessories"
-        style={{ height: 140, margin: "6px 0" }}
-      />
-    </div>
+              {/* Column 2 → Accessories Image */}
+              <div
+                style={{
+                  minHeight: 120,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 600,
+                }}
+              >
+                <img
+                  src="/shantha-access.png"
+                  alt="Accessories"
+                  style={{ height: 140, margin: "6px 0" }}
+                />
+              </div>
 
-    {/* Column 3 → Documents Required */}
-    <div>
-      <div style={{ fontWeight: 700, marginBottom: 4 }}>Documents Required</div>
-      <PrintList items={docsReq} />
-    </div>
-  </div>
-</div>
+              {/* Column 3 → Documents Required */}
+              <div>
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>Documents Required</div>
+                <PrintList items={docsReq} />
+              </div>
+            </div>
+          </div>
 
           {/* Footer note */}
           <div style={{ fontSize: "9.5pt", display: "flex", justifyContent: "space-between" }}>
