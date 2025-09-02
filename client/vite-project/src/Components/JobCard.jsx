@@ -45,7 +45,7 @@ const EXECUTIVES = [
 ];
 
 const SERVICE_TYPES = ["Free", "Paid", "Minor"]; // shown as checkboxes (single-select enforced)
-const VEHICLE_TYPES = ["Scooter", "Motorcycle"]; // tabs
+const VEHICLE_TYPES = [ "Motorcycle", "Scooter"]; // tabs
 const MECHANIC = ["Sonu", "ManMohan", "Mansur", "Irshad"];
 
 // NEW: Fuel Level (tabs)
