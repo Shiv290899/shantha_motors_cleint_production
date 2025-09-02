@@ -9,7 +9,6 @@ import Login from "./Components/Login";
 import Register from "./Components/Register";
 import Navbar from "./Components/Navbar"; // ✅ new
 import Quotation from "./Components/Quotation";
-import ProtectedRoute from "./compo/ProtectedRoute";
 import JobCard from "./Components/JobCard";
 
 function App() {
@@ -17,7 +16,7 @@ function App() {
     <>
       <Navbar /> {/* ✅ shown on every page */}
       <Routes>
-        <Route path="/" element={<ProtectedRoute><Home/></ProtectedRoute>} />
+        <Route path="/" element={<Home /></Route>} />
         <Route path="/home" element={<Home />} />
 
         <Route path="/login" element={<Login />} />
