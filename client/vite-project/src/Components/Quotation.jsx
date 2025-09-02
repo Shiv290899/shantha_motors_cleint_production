@@ -410,11 +410,12 @@ export default function Quotation() {
       .box { border: 2px solid #000; border-radius: 6px; padding: 8px 10px; }
       .plist { margin: 0; padding-left: 18px; }
       .plist li { margin: 0 0 2px; }
-      .title-knhonda { font-size: 25pt; font-weight: 900; letter-spacing: .2px; }
-      .title-kn { font-size: 35pt; font-weight: 900; letter-spacing: .2px; }
+      .title-knhonda { font-size: 30pt; font-weight: 900; letter-spacing: .2px; }
+      .title-kn { font-size: 38pt; font-weight: 900; letter-spacing: .2px; }
       .title-en { font-size: 20pt; font-weight: 800; margin-top: 2px; }
       .big-price { font-size: 16pt; font-weight: 900; }
-      .addr-line { font-size: 8pt; }
+      .addr-line { font-size: 9pt; }
+      .addr-linehonda { font-size: 12pt; }
       .quo-box { font-size: 17pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; position: absolute; left: 50%; transform: translateX(-50%); }
       .hdr-line { position: relative; display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px; }
       .hdr-centre { text-align:center; font-weight:600; }
@@ -856,84 +857,118 @@ export default function Quotation() {
             </div>
           </div>
 
-          {/* Brand block */}
-         {/* Brand block */}
+{/* Brand block */}
 <div
   style={{
-    display: "grid",
-    gridTemplateColumns: "1fr auto auto", // extra column for QR
-    alignItems: "center",
     borderBottom: "2px solid #000",
     paddingBottom: 6,
     marginBottom: 8,
-    gap: 16,
+    display: "grid",
+    gridTemplateRows: "auto auto", // Row 1: titles, Row 2: addresses + QR/Logo
+    rowGap: 8,
   }}
 >
-  {/* Left: Titles + Address + Mobile */}
-  <div>
+  {/* ===== Row 1: Titles (full width, one line) ===== */}
+  <div
+    style={{
+      display: "flex",
+      alignItems: "baseline",
+      gap: 8,
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+    }}
+  >
     {brand === "SHANTHA" ? (
       <>
-       <div className="title-kn" style={{ whiteSpace: "nowrap" }}>
-  ಶಾಂತ ಮೋಟರ್ಸ್
-</div>
-        <div className="title-en">Shantha Motors</div>
-
-        <div style={{ marginTop: 6 }}>
-          <div className="addr-line">• Kadabagere,Besides State Bank India ,Magadi Main Road, Bangalore - 562130</div>
-          <div className="addr-line">• No.195, Oppsit. to Muddanna Ceramics, Ullal Main Road, Bangalore - 560091</div>
-          <div className="addr-line">• Opp. Lense Cart, D - Group Layout,  Gidadakonenahalli, Bangalore - 560091</div>
-          <div className="addr-line">• No.1, Opp to Udupi Garden Hotel, Andrahalli Main Road, Bangalore - 560091</div>
-          <div className="addr-line">• Tavarekere, Besides Poorvika Elect., Magadi Main Road, Bangalore - 562130</div>
-          <div className="addr-line">• Hegganahalli, Anjaneya Temple, Hegganahalli Main Road, Bangalore - 560091</div>
-          <div className="addr-line">• No.34/1,Opp.Sarita Bar,Channenahalli,Magadi Main Road, Bangalore - 562130</div>
-          <div className="addr-line">• No.14,Nelagadrahalli Main road,Nr St Joseph's College, Bangalore - 560073</div>
+        <div className="title-kn" style={{ whiteSpace: "nowrap" }}>
+          ಶಾಂತ ಮೋಟರ್ಸ್
         </div>
-        <div style={{ marginTop: 6, fontWeight: 600 }}>
-          Mob: 9731366921 / 8073283502 / 9035131806
+        <div className="title-en" style={{ whiteSpace: "nowrap" }}>
+          Shantha Motors
         </div>
       </>
     ) : (
       <>
-        <div className="title-row">
-          <div className="title-knhonda">ಎನ್ ಎಚ್ ಮೋಟರ್ಸ್</div>
-          <div className="title-en">NH Motors</div>
+        <div className="title-knhonda" style={{ whiteSpace: "nowrap" }}>
+          ಎನ್ ಎಚ್ ಮೋಟರ್ಸ್
         </div>
-        <div style={{ marginTop: 6 }}>
-          <div className="addr-line">
-            Site No. 116/1, Bydarahalli, Magadi Main Road, Opp. HP Petrol Bunk,
-            Bangalore - 560091
-          </div>
-        </div>
-        <div style={{ marginTop: 6, fontWeight: 600 }}>
-          Mob: 9731366921 / 8073283502 / 9741609799
+        <div className="title-en" style={{ whiteSpace: "nowrap" }}>
+          NH Motors
         </div>
       </>
     )}
   </div>
 
-  {/* Middle: Scanner QR for location */}
-  <div style={{ textAlign: "center" }}>
-    <img
-      src="/location-qr.png"
-      alt="Location QR"
-      style={{ height: "120px", margin: "6px 0", objectFit: "contain" }}
-    />
-    <div style={{ fontSize: 12, fontWeight: 600 }}>Scan for Location</div>
-  </div>
+  {/* ===== Row 2: Left (addresses) + Right (QR + Logo in a ROW) ===== */}
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns: "1fr auto", // left = addresses, right = QR+Logo row
+      columnGap: 16,
+      alignItems: "start",
+    }}
+  >
+    {/* Left: Addresses + Mobile */}
+    <div>
+      {brand === "SHANTHA" ? (
+        <>
+          <div>
+            <div className="addr-line">• Kadabagere,Beside State Bank India,Magadi Main Road, Bangalore - 562130</div>
+            <div className="addr-line">• No.195, Oppsit.to Muddanna Ceramics, Ullal Main Road, Bangalore - 560091</div>
+            <div className="addr-line">• Oppsit. Lens Cart, D - Group Layout, Gidadakonenahalli, Bangalore - 560091</div>
+            <div className="addr-line">• No.1, Opp to Udupi Garden Hotel,Andrahalli Main Road, Bangalore - 560091</div>
+            <div className="addr-line">• Tavarekere, Besides Poorvika Elect., Magadi Main Road, Bangalore - 562130</div>
+            <div className="addr-line">• Hegganahalli,Anjaneya Temple,Hegganahali Main Road, Bangalore - 560091</div>
+            <div className="addr-line">• No.34/1,Opp.Sarita Bar,Channenahali,Magdi Main Road, Bangalore - 562130</div>
+            <div className="addr-line">• No.14, Nelagadrahalli Main Road,Nr St Joseph's College, Bangalore - 560073</div>
+          </div>
+          <div style={{ marginTop: 6, fontWeight: 600 }}>
+            Mob: 9731366921 / 8073283502 / 9035131806
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="addr-linehonda">
+            Site No. 116/1, Bydarahalli, Magadi Main Road, Opp. HP Petrol Bunk, Bangalore - 560091
+          </div>
+          <div style={{ marginTop: 6, fontWeight: 600 }}>
+            Mob: 9731366921 / 8073283502 / 9741609799
+          </div>
+        </>
+      )}
+    </div>
 
-  {/* Right: Brand Logo */}
-  <div style={{ textAlign: "right" }}>
-    <img
-      src={brand === "SHANTHA" ? "/shantha-logoprint.png" : "/honda-logo.png"}
-      alt="Brand Logo"
+    {/* Right: QR + Logo horizontally (ROW) */}
+    <div
       style={{
-        height: brand === "SHANTHA" ? "220px" : "120px",
-        margin: "6px 0",
-        objectFit: "contain",
+        display: "flex",
+        flexDirection: "row", // row-wise as requested
+        alignItems: "center",
+        gap: 16,
+        justifyContent: "flex-end",
       }}
-    />
+    >
+      {/* QR with caption */}
+      <div style={{ textAlign: "center" }}>
+        <img
+          src="/location-qr.png"
+          alt="Location QR"
+          style={{ height: 100, objectFit: "contain" }}
+        />
+        <div style={{ fontSize: 10, fontWeight: 600, marginTop: 4 }}>Scan for Location</div>
+      </div>
+
+      {/* Brand Logo beside QR */}
+      <img
+        src={brand === "SHANTHA" ? "/shantha-logoprint.png" : "/honda-logo.png"}
+        alt="Brand Logo"
+        style={{ height: 140, objectFit: "contain" }}
+      />
+    </div>
   </div>
 </div>
+
 
 
           {/* Customer Box */}
@@ -988,7 +1023,7 @@ export default function Quotation() {
 
        {/* Executive + Fittings + Image + Documents */}
 <div className="box" style={{ marginBottom: 8 }}>
-  <div style={{ marginBottom: 6 }}>
+  <div style={{ marginBottom: 6, fontsize: "13pt", fontWeight: 700 }}>
     <b>Executive name:</b> {executiveName || "-"}
     {(() => {
       const found = EXECUTIVES.find((e) => e.name === executiveName);
