@@ -9,18 +9,21 @@ import Login from "./Components/Login";
 import Register from "./Components/Register";
 import Navbar from "./Components/Navbar"; // ✅ new
 import Quotation from "./Components/Quotation";
+import ProtectedRoute from "./compo/ProtectedRoute";
+import JobCard from "./Components/JobCard";
 
 function App() {
   return (
     <>
       <Navbar /> {/* ✅ shown on every page */}
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<ProtectedRoute><Home/></ProtectedRoute>} />
         <Route path="/home" element={<Home />} />
 
         <Route path="/login" element={<Login />} />
         <Route path="/quotation" element={<Quotation />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/jobcard" element={<JobCard />} />
 
         <Route path="/bookingform" element={<BookingForm />} />
         <Route path="/about" element={<About />} />
