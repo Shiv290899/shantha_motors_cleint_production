@@ -260,6 +260,9 @@ export default function Quotation() {
     return `${dd}/${mm}/${yyyy}`;
   }, []);
 
+  // helper to make image paths absolute for the print iframe
+  const abs = (p) => (p?.startsWith("http") ? p : `${window.location.origin}${p || ""}`);
+
   useEffect(() => {
     (async () => {
       try {
@@ -340,7 +343,7 @@ export default function Quotation() {
     return months > 0 ? total / months : 0;
   };
 
-  // ---------- UPDATED: driver-safe print (A4 in mm, no JS scale) ----------
+  // ---------- driver-safe print (A4 in mm, no JS scale) ----------
   const handlePrint = async () => {
     try {
       await form.validateFields([
@@ -357,15 +360,23 @@ export default function Quotation() {
 
     const cloned = page.cloneNode(true);
 
+    // fix image srcs to absolute URLs inside the cloned DOM
+    cloned.querySelectorAll("img").forEach((img) => {
+      if (img && img.getAttribute("src")) {
+        img.setAttribute("src", abs(img.getAttribute("src")));
+      }
+    });
+
     const PRINT_STYLES = `
       @page { size: A4 portrait; margin: 0; }
-      html, body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      * { -webkit-text-size-adjust: 100%; }
+      html, body { margin: 0; padding: 0; background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      * { -webkit-text-size-adjust: 100%; box-sizing: border-box; }
       .print-wrap { margin: 0 auto; }
       .page {
         width: 210mm;
         min-height: 297mm;
         padding: 12mm;
+        background: #fff !important;
         box-sizing: border-box;
       }
       .sheet {
@@ -375,10 +386,11 @@ export default function Quotation() {
         box-sizing: border-box;
         overflow: visible !important;
         page-break-inside: avoid;
+        background: #fff !important;
       }
       .row2 { display: grid; grid-template-columns: 0.8fr 1.4fr; gap: 8px 16px; }
       .row3 { display: grid; grid-template-columns: 0.5fr 0.8fr 1fr; gap: 10px 16px; }
-      .box { border: 2px solid #000; border-radius: 6px; padding: 8px 10px; }
+      .box { border: 2px solid #000; border-radius: 6px; padding: 8px 10px; background: #fff; }
       .plist { margin: 0; padding-left: 18px; }
       .plist li { margin: 0 0 2px; }
       .title-knhonda { font-size: 30pt; font-weight: 900; letter-spacing: .2px; }
@@ -387,13 +399,13 @@ export default function Quotation() {
       .big-price { font-size: 16pt; font-weight: 900; }
       .addr-line { font-size: 11pt; }
       .addr-linehonda { font-size: 12pt; }
-      .quo-box { font-size: 17pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; position: absolute; left: 50%; transform: translateX(-50%); }
-      .hdr-line { position: relative; display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px; }
-      .hdr-centre { text-align:center; font-weight:600; }
-      .hdr-right { margin-left: auto; text-align:right; font-weight:600; }
+      .hdr-line { display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px; }
+      .hdr-title { flex: 1; display: flex; justify-content: center; }
+      .quo-box { font-size: 17pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; display: inline-block; }
+      .hdr-right { text-align: right; font-weight: 600; }
       .emibox { border: 2px solid #000; border-radius: 8px; padding: 6px 10px; text-align: center; }
       .section-title { font-size: 14pt; font-weight: 900; margin-bottom: 4px; }
-      img { max-width: 100%; height: auto; }
+      img { max-width: 100%; height: auto; background: transparent; }
       @media print { .no-print { display: none !important; } }
     `;
 
@@ -748,7 +760,7 @@ export default function Quotation() {
                     value={fittings}
                     onChange={setFittings}
                   >
-                    {currentFittingOptions.map((opt) => (
+                    {(vehicleType === "scooter" ? SCOOTER_OPTIONS : MOTORCYCLE_OPTIONS).map((opt) => (
                       <div key={opt} style={{ marginBottom: 6 }}>
                         <Checkbox value={opt}>{opt}</Checkbox>
                       </div>
@@ -801,21 +813,21 @@ export default function Quotation() {
           <div className="sheet">
 
             {/* Header */}
-            <div className="hdr-line" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div className="hdr-line">
               <div style={{ textAlign: "center", marginRight: 12 }}>
                 <img
-                  src="/location-qr.png"
+                  src={abs("/location-qr.png")}
                   alt="Location QR"
                   style={{ height: 50, objectFit: "contain" }}
                 />
                 <div style={{ fontSize: 8, fontWeight: 600, marginTop: 4 }}>Scan for Location</div>
               </div>
 
-              <div className="quo-box" style={{ flex: 1, textAlign: "center" }}>
-                QUOTATION
+              <div className="hdr-title">
+                <div className="quo-box">QUOTATION</div>
               </div>
 
-              <div className="hdr-right" style={{ textAlign: "right" }}>
+              <div className="hdr-right">
                 <div>Sl. No.: {form.getFieldValue("serialNo") || "-"}</div>
                 <div>Date: {printDate}</div>
               </div>
@@ -912,7 +924,7 @@ export default function Quotation() {
                   }}
                 >
                   <img
-                    src={brand === "SHANTHA" ? "/shantha-logoprint.png" : "/honda-logo.png"}
+                    src={abs(brand === "SHANTHA" ? "/shantha-logoprint.png" : "/honda-logo.png")}
                     alt="Brand Logo"
                     style={{
                       height: brand === "SHANTHA" ? 160 : 120,
@@ -1006,7 +1018,7 @@ export default function Quotation() {
                   }}
                 >
                   <img
-                    src="/shantha-access.png"
+                    src={abs("/shantha-access.png")}
                     alt="Accessories"
                     style={{ height: 140, margin: "6px 0" }}
                   />
