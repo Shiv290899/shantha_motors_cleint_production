@@ -20,12 +20,15 @@ const ENTRY = {
   remarks: "entry.1055001846",
 };
 
-const RESPONSES_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRXJ4xTMWJVv7v-U9SD8R5X2z4Lt0EBUeOOo6_leF-75-gToGJV1yxBk3YUooCtMAJ410quZN7UrhnO/pub?output=csv";
+const RESPONSES_CSV_URL =
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vRXJ4xTMWJVv7v-U9SD8R5X2z4Lt0EBUeOOo6_leF-75-gToGJV1yxBk3YUooCtMAJ410quZN7UrhnO/pub?output=csv";
 
 /* ======================
    GOOGLE SHEETS (VEHICLE DATA) CSV LOADER
    ====================== */
-const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQsXcqX5kmqG1uKHuWUnBCjMXBugJn7xljgBsRPIm2gkk2PpyRnEp8koausqNflt6Q4Gnqjczva82oN/pub?output=csv";
+const SHEET_CSV_URL =
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQsXcqX5kmqG1uKHuWUnBCjMXBugJn7xljgBsRPIm2gkk2PpyRnEp8koausqNflt6Q4Gnqjczva82oN/pub?output=csv";
+
 const HEADERS = {
   company: ["Company", "Company Name"],
   model: ["Model", "Model Name"],
@@ -253,15 +256,20 @@ export default function Quotation() {
 
   const pageRef = useRef(null);
   const printDate = useMemo(() => {
-    const d = new Date();
-    const dd = String(d.getDate()).padStart(2, "0");
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const yyyy = d.getFullYear();
-    return `${dd}/${mm}/${yyyy}`;
-  }, []);
+  const d = new Date();
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}, []);
 
-  // helper to make image paths absolute for the print iframe
-  const abs = (p) => (p?.startsWith("http") ? p : `${window.location.origin}${p || ""}`);
+
+  // helper to make image paths absolute for the print iframe + cache-bust
+  const absBust = (p) => {
+    const src = p?.startsWith("http") ? p : `${window.location.origin}${p || ""}`;
+    const v = Date.now();
+    return src.includes("?") ? `${src}&v=${v}` : `${src}?v=${v}`;
+  };
 
   useEffect(() => {
     (async () => {
@@ -343,7 +351,7 @@ export default function Quotation() {
     return months > 0 ? total / months : 0;
   };
 
-  // ---------- driver-safe print (A4 in mm, no JS scale) ----------
+  // ---------- Android-proof A4 print ----------
   const handlePrint = async () => {
     try {
       await form.validateFields([
@@ -358,19 +366,30 @@ export default function Quotation() {
     const page = pageRef.current;
     if (!page) { window.print(); return; }
 
+    // Ensure latest React commit is flushed
+    await new Promise((r) => setTimeout(r, 0));
+
     const cloned = page.cloneNode(true);
 
-    // fix image srcs to absolute URLs inside the cloned DOM
+    // Make all image URLs absolute + cache-busted (avoid stale Android preview)
     cloned.querySelectorAll("img").forEach((img) => {
-      if (img && img.getAttribute("src")) {
-        img.setAttribute("src", abs(img.getAttribute("src")));
-      }
+      const src = img.getAttribute("src");
+      if (src) img.setAttribute("src", absBust(src));
     });
 
     const PRINT_STYLES = `
       @page { size: A4 portrait; margin: 0; }
-      html, body { margin: 0; padding: 0; background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      * { -webkit-text-size-adjust: 100%; box-sizing: border-box; }
+      @viewport { width: device-width; }
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        -webkit-text-size-adjust: 100% !important;
+        text-size-adjust: 100% !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      * { box-sizing: border-box; }
       .print-wrap { margin: 0 auto; }
       .page {
         width: 210mm;
@@ -383,7 +402,6 @@ export default function Quotation() {
         width: 100%;
         font: 12pt/1.32 "Helvetica Neue", Arial, sans-serif;
         color: #111;
-        box-sizing: border-box;
         overflow: visible !important;
         page-break-inside: avoid;
         background: #fff !important;
@@ -450,13 +468,18 @@ export default function Quotation() {
             : new Promise(res => { img.onload = img.onerror = () => res(); })
         )
       );
-      if (doc.fonts && doc.fonts.ready) { try { await doc.fonts.ready; } catch {} }
-      await new Promise(res => setTimeout(res, 0));
+      if (doc.fonts && doc.fonts.ready) { try { await doc.fonts.ready; } catch {
+        // ignore font load failures
+      } }
+      // Give Android compositor a little settle time
+      await new Promise(res => setTimeout(res, 300));
     };
 
     try {
       await waitForAssets();
-      try { win.focus(); } catch {}
+      try { win.focus(); } catch {
+        //ignore
+      }
       try { win.print(); } catch { window.print(); }
     } finally {
       setTimeout(() => {
@@ -477,7 +500,7 @@ export default function Quotation() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handlePrint]);
+  }, []); // handlePrint uses stable inner functions/values
 
   const handleSaveToForm = async () => {
     const v = await form.validateFields([
@@ -541,9 +564,6 @@ export default function Quotation() {
     if (!items?.length) return <span>-</span>;
     return <ul className="plist">{items.map((t) => <li key={t}>{t}</li>)}</ul>;
   };
-
-  const currentFittingOptions =
-    vehicleType === "scooter" ? SCOOTER_OPTIONS : MOTORCYCLE_OPTIONS;
 
   return (
     <>
@@ -816,7 +836,7 @@ export default function Quotation() {
             <div className="hdr-line">
               <div style={{ textAlign: "center", marginRight: 12 }}>
                 <img
-                  src={abs("/location-qr.png")}
+                  src={"/location-qr.png"}
                   alt="Location QR"
                   style={{ height: 50, objectFit: "contain" }}
                 />
@@ -924,7 +944,7 @@ export default function Quotation() {
                   }}
                 >
                   <img
-                    src={abs(brand === "SHANTHA" ? "/shantha-logoprint.png" : "/honda-logo.png")}
+                    src={brand === "SHANTHA" ? "/shantha-logoprint.png" : "/honda-logo.png"}
                     alt="Brand Logo"
                     style={{
                       height: brand === "SHANTHA" ? 160 : 120,
@@ -1018,7 +1038,7 @@ export default function Quotation() {
                   }}
                 >
                   <img
-                    src={abs("/shantha-access.png")}
+                    src={"/shantha-access.png"}
                     alt="Accessories"
                     style={{ height: 140, margin: "6px 0" }}
                   />
