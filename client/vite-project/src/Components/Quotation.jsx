@@ -237,7 +237,7 @@ export default function Quotation() {
 
   const [mode, setMode] = useState("cash");
 
-  const [emiSet, setEmiSet] = useState("12"); // "12" or "48"
+  const [emiSet, setEmiSet] = useState("12");
   const tenures = useMemo(
     () => (emiSet === "12" ? [12, 18, 24, 30] : [24, 30, 36, 48]),
     [emiSet]
@@ -251,7 +251,7 @@ export default function Quotation() {
 
   const executiveName = Form.useWatch("executive", form) || EXECUTIVES[0].name;
 
-  const sheetRef = useRef(null);
+  const pageRef = useRef(null);
   const printDate = useMemo(() => {
     const d = new Date();
     const dd = String(d.getDate()).padStart(2, "0");
@@ -340,9 +340,8 @@ export default function Quotation() {
     return months > 0 ? total / months : 0;
   };
 
-  // ---------- UPDATED: cross-device single-page consistent print (non-iOS) ----------
+  // ---------- UPDATED: driver-safe print (A4 in mm, no JS scale) ----------
   const handlePrint = async () => {
-    
     try {
       await form.validateFields([
         "serialNo", "name", "mobile", "address",
@@ -353,26 +352,28 @@ export default function Quotation() {
       return;
     }
 
-    const sheet = sheetRef.current;
-    if (!sheet) {
-      window.print();
-      return;
-    }
+    const page = pageRef.current;
+    if (!page) { window.print(); return; }
 
-    const cloned = sheet.cloneNode(true);
+    const cloned = page.cloneNode(true);
 
     const PRINT_STYLES = `
-      @page { size: A4 portrait; margin: 12mm; }
-      html, body { margin: 0; padding: 0; }
+      @page { size: A4 portrait; margin: 0; }
+      html, body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      * { -webkit-text-size-adjust: 100%; }
       .print-wrap { margin: 0 auto; }
+      .page {
+        width: 210mm;
+        min-height: 297mm;
+        padding: 12mm;
+        box-sizing: border-box;
+      }
       .sheet {
-        width: 186mm;
+        width: 100%;
         font: 12pt/1.32 "Helvetica Neue", Arial, sans-serif;
         color: #111;
         box-sizing: border-box;
-        transform-origin: top left;
         overflow: visible !important;
-        -webkit-print-color-adjust: exact; print-color-adjust: exact;
         page-break-inside: avoid;
       }
       .row2 { display: grid; grid-template-columns: 0.8fr 1.4fr; gap: 8px 16px; }
@@ -437,45 +438,13 @@ export default function Quotation() {
             : new Promise(res => { img.onload = img.onerror = () => res(); })
         )
       );
-      if (doc.fonts && doc.fonts.ready) { try { await doc.fonts.ready; } catch {
-        //ignore
-      } }
+      if (doc.fonts && doc.fonts.ready) { try { await doc.fonts.ready; } catch {} }
       await new Promise(res => setTimeout(res, 0));
     };
 
-    const mmToPx = (mm) => (mm / 25.4) * 96;
-    const usableWidthPx = mmToPx(186);
-    const usableHeightPx = mmToPx(277);
-
     try {
       await waitForAssets();
-
-      const sheetEl = doc.querySelector(".sheet");
-      if (!sheetEl) { win.print(); return; }
-
-      sheetEl.style.transform = "none";
-      sheetEl.style.height = "auto";
-
-      const contentWidth = sheetEl.scrollWidth;
-      const contentHeight = sheetEl.scrollHeight;
-
-      const scaleW = usableWidthPx / Math.max(1, contentWidth);
-      const scaleH = usableHeightPx / Math.max(1, contentHeight);
-      const scale = Math.min(1, scaleW, scaleH);
-
-      if (scale < 1) {
-        sheetEl.style.transform = `scale(${scale})`;
-        sheetEl.style.height = `${Math.ceil(contentHeight * scale)}px`;
-        sheetEl.style.overflow = "hidden";
-      } else {
-        sheetEl.style.height = `${contentHeight}px`;
-      }
-
-      await new Promise(res => setTimeout(res, 50));
-
-      try { win.focus(); } catch {
-        //ignore
-      }
+      try { win.focus(); } catch {}
       try { win.print(); } catch { window.print(); }
     } finally {
       setTimeout(() => {
@@ -483,23 +452,20 @@ export default function Quotation() {
       }, 1000);
     }
   };
+
   // Capture Ctrl/Cmd + P and route to handlePrint
-useEffect(() => {
-  const onKeyDown = (e) => {
-    // Ctrl+P (Win/Linux/Android/Chromebook) or Cmd+P (macOS)
-    const isPrintShortcut =
-      (e.ctrlKey || e.metaKey) && (e.key === "p" || e.key === "P");
-
-    if (isPrintShortcut) {
-      e.preventDefault();   // stop the browser's default print
-      handlePrint();        // run your single-page print logic
-    }
-  };
-
-  window.addEventListener("keydown", onKeyDown);
-  return () => window.removeEventListener("keydown", onKeyDown);
-}, [handlePrint]);
-
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      const isPrintShortcut =
+        (e.ctrlKey || e.metaKey) && (e.key === "p" || e.key === "P");
+      if (isPrintShortcut) {
+        e.preventDefault();
+        handlePrint();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handlePrint]);
 
   const handleSaveToForm = async () => {
     const v = await form.validateFields([
@@ -569,16 +535,13 @@ useEffect(() => {
 
   return (
     <>
-      {/* Screen-only styles */}
       <style>{`
         .wrap { max-width: 1000px; margin: 12px auto; padding: 0 12px; }
         .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; }
-        /* screen-only responsiveness for brand row (does not affect print) */
         @media screen and (max-width: 600px) {
           .brand-row2 { grid-template-columns: 1fr !important; row-gap: 8px; }
           .brand-right { justify-content: flex-start !important; }
         }
-        /* hide print area on screen if you prefer */
         .print-sheet { display: none; }
         @media print { .print-sheet { display: block; } .no-print { display: none !important; } }
       `}</style>
@@ -834,244 +797,232 @@ useEffect(() => {
 
       {/* ---------- PRINT SLIP (A4) ---------- */}
       <div className="print-sheet">
-        <div className="sheet" ref={sheetRef}>
+        <div className="page" ref={pageRef}>
+          <div className="sheet">
 
-         {/* Header row: QR (left) + QUOTATION + Serial/Date (right) */}
-<div className="hdr-line" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-  
-  {/* Left QR block */}
-  <div style={{ textAlign: "center", marginRight: 12 }}>
-    <img
-      src="/location-qr.png"
-      alt="Location QR"
-      style={{ height: 50, objectFit: "contain" }}
-    />
-    <div style={{ fontSize: 8, fontWeight: 600, marginTop: 4 }}>Scan for Location</div>
-  </div>
+            {/* Header */}
+            <div className="hdr-line" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ textAlign: "center", marginRight: 12 }}>
+                <img
+                  src="/location-qr.png"
+                  alt="Location QR"
+                  style={{ height: 50, objectFit: "contain" }}
+                />
+                <div style={{ fontSize: 8, fontWeight: 600, marginTop: 4 }}>Scan for Location</div>
+              </div>
 
-  {/* Center: QUOTATION */}
-  <div className="quo-box" style={{ flex: 1, textAlign: "center" }}>
-    QUOTATION
-  </div>
+              <div className="quo-box" style={{ flex: 1, textAlign: "center" }}>
+                QUOTATION
+              </div>
 
-  {/* Right: Serial + Date */}
-  <div className="hdr-right" style={{ textAlign: "right" }}>
-    <div>Sl. No.: {form.getFieldValue("serialNo") || "-"}</div>
-    <div>Date: {printDate}</div>
-  </div>
-</div>
-
-
-          {/* Brand block (two rows): Row1 title; Row2 addresses + (QR + Logo in a row) */}
-          <div
-            style={{
-              borderBottom: "2px solid #000",
-              paddingBottom: 6,
-              marginBottom: 8,
-              display: "grid",
-              gridTemplateRows: "auto auto",
-              rowGap: 8,
-            }}
-          >
-            {/* Row 1: Titles on one line */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "baseline",
-                gap: 8,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {brand === "SHANTHA" ? (
-                <>
-                  <div className="title-kn" style={{ whiteSpace: "nowrap" }}>
-                    ಶಾಂತ ಮೋಟರ್ಸ್
-                  </div>
-                  <div className="title-en" style={{ whiteSpace: "nowrap" }}>
-                    Shantha Motors
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="title-knhonda" style={{ whiteSpace: "nowrap" }}>
-                    ಎನ್ ಎಚ್ ಮೋಟರ್ಸ್
-                  </div>
-                  <div className="title-en" style={{ whiteSpace: "nowrap" }}>
-                    NH Motors
-                  </div>
-                </>
-              )}
+              <div className="hdr-right" style={{ textAlign: "right" }}>
+                <div>Sl. No.: {form.getFieldValue("serialNo") || "-"}</div>
+                <div>Date: {printDate}</div>
+              </div>
             </div>
 
-            {/* Row 2: addresses (left) + QR+Logo (right as row) */}
+            {/* Brand block */}
             <div
-              className="brand-row2"
               style={{
+                borderBottom: "2px solid #000",
+                paddingBottom: 6,
+                marginBottom: 8,
                 display: "grid",
-                gridTemplateColumns: "1fr auto",
-                columnGap: 16,
-                alignItems: "start",
+                gridTemplateRows: "auto auto",
+                rowGap: 8,
               }}
             >
-              {/* Left: Addresses + Mobile */}
-              <div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: 8,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
                 {brand === "SHANTHA" ? (
                   <>
-                    <div>
-                      <div className="addr-line">• Kadabagere,Beside State Bank India,Magadi Main Road, Bangalore - 562130</div>
-                      <div className="addr-line">• No.195, Oppsit.to Muddanna Ceramics, Ullal Main Road, Bangalore - 560091</div>
-                      <div className="addr-line">• Oppsit. Lens Cart, D - Group Layout, Gidadakonenahalli, Bangalore - 560091</div>
-                      <div className="addr-line">• No.1, Opp to Udupi Garden Hotel,Andrahalli Main Road, Bangalore - 560091</div>
-                      <div className="addr-line">• Tavarekere, Besides Poorvika Elect., Magadi Main Road, Bangalore - 562130</div>
-                      <div className="addr-line">• Hegganahalli,Anjaneya Temple,Hegganahali Main Road, Bangalore - 560091</div>
-                      <div className="addr-line">• No.34/1,Opp.Sarita Bar,Channenahali,Magdi Main Road, Bangalore - 562130</div>
-                      <div className="addr-line">• No.14,Nelagadrahalli Main Road,Nr St Joseph's College, Bangalore - 560073</div>
+                    <div className="title-kn" style={{ whiteSpace: "nowrap" }}>
+                      ಶಾಂತ ಮೋಟರ್ಸ್
                     </div>
-                    <div style={{ marginTop: 6, fontWeight: 600 }}>
-                      Mob: 9731366921 / 8073283502 / 9035131806
+                    <div className="title-en" style={{ whiteSpace: "nowrap" }}>
+                      Shantha Motors
                     </div>
                   </>
                 ) : (
                   <>
-                    <div className="addr-linehonda">
-                      Site No. 116/1, Bydarahalli, Magadi Main Road, Opp. HP Petrol Bunk, Bangalore - 560091
+                    <div className="title-knhonda" style={{ whiteSpace: "nowrap" }}>
+                      ಎನ್ ಎಚ್ ಮೋಟರ್ಸ್
                     </div>
-                    <div style={{ marginTop: 6, fontWeight: 600 }}>
-                      Mob: 9731366921 / 8073283502 / 9741609799
+                    <div className="title-en" style={{ whiteSpace: "nowrap" }}>
+                      NH Motors
                     </div>
                   </>
                 )}
               </div>
 
-              {/* Right: Logo row */}
               <div
-                className="brand-right"
+                className="brand-row2"
                 style={{
-                  display: "flex",
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 16,
-                  justifyContent: "flex-end",
+                  display: "grid",
+                  gridTemplateColumns: "1fr auto",
+                  columnGap: 16,
+                  alignItems: "start",
                 }}
               >
-                <img
-  src={brand === "SHANTHA" ? "/shantha-logoprint.png" : "/honda-logo.png"}
-  alt="Brand Logo"
-  style={{
-    height: brand === "SHANTHA" ? 160 : 120, // different height per logo
-    objectFit: "contain",
-  }}
-/>
-
-              </div>
-            </div>
-          </div>
-
-          {/* Customer Box */}
-          <div className="box" style={{ marginBottom: 8 }}>
-            <div className="section-title">Customer Details</div>
-            <div className="row2">
-              <div><b>Name:</b> {form.getFieldValue("name") || "-"}</div>
-              <div><b>Mobile:</b> {form.getFieldValue("mobile") || "-"}</div>
-              <div style={{ gridColumn: "1 / span 2" }}><b>Address:</b> {form.getFieldValue("address") || "-"}</div>
-            </div>
-          </div>
-
-          {/* Vehicle Box */}
-          <div className="box" style={{ marginBottom: 8 }}>
-            <div className="section-title">Vehicle Details</div>
-            <div className="row3" style={{ fontSize: "12pt" }}>
-              <div><b>Company:</b> {company || form.getFieldValue("company") || "-"}</div>
-              <div><b>Model:</b> {model || form.getFieldValue("bikeModel") || "-"}</div>
-              <div><b>Variant:</b> {variant || form.getFieldValue("variant") || "-"}</div>
-            </div>
-            <div style={{ marginTop: 6, textAlign: "center" }}>
-              <span className="big-price">
-                <span><b>On-Road Price:</b> </span>
-                {inr0(form.getFieldValue("onRoadPrice") ?? onRoadPrice ?? 0)}
-              </span>
-            </div>
-          </div>
-
-          {/* Down Payment + EMI DETAILS */}
-          {mode === "loan" && (
-            <div className="box" style={{ marginBottom: 8 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 12, alignItems: "start" }}>
                 <div>
-                  <div style={{ fontWeight: 700, marginBottom: 4, fontSize: "12pt" }}>Down Payment</div>
-                  <div style={{ fontWeight: 800, fontSize: "18pt" }}>{inr0(downPayment || 0)}</div>
+                  {brand === "SHANTHA" ? (
+                    <>
+                      <div>
+                        <div className="addr-line">• Kadabagere,Beside State Bank India,Magadi Main Road, Bangalore - 562130</div>
+                        <div className="addr-line">• No.195, Oppsit.to Muddanna Ceramics, Ullal Main Road, Bangalore - 560091</div>
+                        <div className="addr-line">• Oppsit. Lens Cart, D - Group Layout, Gidadakonenahalli, Bangalore - 560091</div>
+                        <div className="addr-line">• No.1, Opp to Udupi Garden Hotel,Andrahalli Main Road, Bangalore - 560091</div>
+                        <div className="addr-line">• Tavarekere, Besides Poorvika Elect., Magadi Main Road, Bangalore - 562130</div>
+                        <div className="addr-line">• Hegganahalli,Anjaneya Temple,Hegganahali Main Road, Bangalore - 560091</div>
+                        <div className="addr-line">• No.34/1,Opp.Sarita Bar,Channenahali,Magdi Main Road, Bangalore - 562130</div>
+                        <div className="addr-line">• No.14,Nelagadrahalli Main Road,Nr St Joseph's College, Bangalore - 560073</div>
+                      </div>
+                      <div style={{ marginTop: 6, fontWeight: 600 }}>
+                        Mob: 9731366921 / 8073283502 / 9035131806
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="addr-linehonda">
+                        Site No. 116/1, Bydarahalli, Magadi Main Road, Opp. HP Petrol Bunk, Bangalore - 560091
+                      </div>
+                      <div style={{ marginTop: 6, fontWeight: 600 }}>
+                        Mob: 9731366921 / 8073283502 / 9741609799
+                      </div>
+                    </>
+                  )}
                 </div>
 
-                <div>
-                  <div style={{ fontWeight: 900, textAlign: "center", marginBottom: 4, fontSize: "14pt" }}>EMI DETAILS</div>
-                  <div style={{ display: "flex", gap: 8, justifyContent: "space-between", flexWrap: "wrap" }}>
-                    {tenures.map((mo) => (
-                      <div key={mo} className="emibox" style={{ flex: 1, minWidth: 120 }}>
-                        <div style={{ fontWeight: 700 }}>{mo} months</div>
-                        <div style={{ fontWeight: 900 }}>{inr0(monthlyFor(mo))}</div>
-                      </div>
-                    ))}
+                <div
+                  className="brand-right"
+                  style={{
+                    display: "flex",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 16,
+                    justifyContent: "flex-end",
+                  }}
+                >
+                  <img
+                    src={brand === "SHANTHA" ? "/shantha-logoprint.png" : "/honda-logo.png"}
+                    alt="Brand Logo"
+                    style={{
+                      height: brand === "SHANTHA" ? 160 : 120,
+                      objectFit: "contain",
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Customer */}
+            <div className="box" style={{ marginBottom: 8 }}>
+              <div className="section-title">Customer Details</div>
+              <div className="row2">
+                <div><b>Name:</b> {form.getFieldValue("name") || "-"}</div>
+                <div><b>Mobile:</b> {form.getFieldValue("mobile") || "-"}</div>
+                <div style={{ gridColumn: "1 / span 2" }}><b>Address:</b> {form.getFieldValue("address") || "-"}</div>
+              </div>
+            </div>
+
+            {/* Vehicle */}
+            <div className="box" style={{ marginBottom: 8 }}>
+              <div className="section-title">Vehicle Details</div>
+              <div className="row3" style={{ fontSize: "12pt" }}>
+                <div><b>Company:</b> {company || form.getFieldValue("company") || "-"}</div>
+                <div><b>Model:</b> {model || form.getFieldValue("bikeModel") || "-"}</div>
+                <div><b>Variant:</b> {variant || form.getFieldValue("variant") || "-"}</div>
+              </div>
+              <div style={{ marginTop: 6, textAlign: "center" }}>
+                <span className="big-price">
+                  <span><b>On-Road Price:</b> </span>
+                  {inr0(form.getFieldValue("onRoadPrice") ?? onRoadPrice ?? 0)}
+                </span>
+              </div>
+            </div>
+
+            {/* EMI */}
+            {mode === "loan" && (
+              <div className="box" style={{ marginBottom: 8 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 12, alignItems: "start" }}>
+                  <div>
+                    <div style={{ fontWeight: 700, marginBottom: 4, fontSize: "12pt" }}>Down Payment</div>
+                    <div style={{ fontWeight: 800, fontSize: "18pt" }}>{inr0(downPayment || 0)}</div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontWeight: 900, textAlign: "center", marginBottom: 4, fontSize: "14pt" }}>EMI DETAILS</div>
+                    <div style={{ display: "flex", gap: 8, justifyContent: "space-between", flexWrap: "wrap" }}>
+                      {tenures.map((mo) => (
+                        <div key={mo} className="emibox" style={{ flex: 1, minWidth: 120 }}>
+                          <div style={{ fontWeight: 700 }}>{mo} months</div>
+                          <div style={{ fontWeight: 900 }}>{inr0(monthlyFor(mo))}</div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Executive + Fittings + Image + Documents */}
-          <div className="box" style={{ marginBottom: 8 }}>
-            <div style={{ marginBottom: 6, fontSize: "13pt", fontWeight: 700 }}>
-              <b>Executive name:</b> {executiveName || "-"}
-              {(() => {
-                const found = EXECUTIVES.find((e) => e.name === executiveName);
-                return found ? ` (${found.phone})` : "";
-              })()}
-            </div>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "0.6fr 1fr 1fr",
-                gap: 16,
-                alignItems: "start",
-              }}
-            >
-              {/* Column 1 → Free Extra Fittings */}
-              <div>
-                <div style={{ fontWeight: 700, marginBottom: 4 }}>Free Extra Fittings</div>
-                <PrintList items={fittings} />
+            {/* Executive + fittings + docs */}
+            <div className="box" style={{ marginBottom: 8 }}>
+              <div style={{ marginBottom: 6, fontSize: "13pt", fontWeight: 700 }}>
+                <b>Executive name:</b> {executiveName || "-"}
+                {(() => {
+                  const found = EXECUTIVES.find((e) => e.name === executiveName);
+                  return found ? ` (${found.phone})` : "";
+                })()}
               </div>
 
-              {/* Column 2 → Accessories Image */}
               <div
                 style={{
-                  minHeight: 120,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontWeight: 600,
+                  display: "grid",
+                  gridTemplateColumns: "0.6fr 1fr 1fr",
+                  gap: 16,
+                  alignItems: "start",
                 }}
               >
-                <img
-                  src="/shantha-access.png"
-                  alt="Accessories"
-                  style={{ height: 140, margin: "6px 0" }}
-                />
-              </div>
+                <div>
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>Free Extra Fittings</div>
+                  <PrintList items={fittings} />
+                </div>
 
-              {/* Column 3 → Documents Required */}
-              <div>
-                <div style={{ fontWeight: 700, marginBottom: 4 }}>Documents Required</div>
-                <PrintList items={docsReq} />
+                <div
+                  style={{
+                    minHeight: 120,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 600,
+                  }}
+                >
+                  <img
+                    src="/shantha-access.png"
+                    alt="Accessories"
+                    style={{ height: 140, margin: "6px 0" }}
+                  />
+                </div>
+
+                <div>
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>Documents Required</div>
+                  <PrintList items={docsReq} />
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Footer note */}
-          <div style={{ fontSize: "9.5pt", display: "flex", justifyContent: "space-between" }}>
-            <div />
-            <div><b>Note:</b> Prices are indicative and subject to change without prior notice.</div>
+            <div style={{ fontSize: "9.5pt", display: "flex", justifyContent: "space-between" }}>
+              <div />
+              <div><b>Note:</b> Prices are indicative and subject to change without prior notice.</div>
+            </div>
           </div>
         </div>
       </div>
