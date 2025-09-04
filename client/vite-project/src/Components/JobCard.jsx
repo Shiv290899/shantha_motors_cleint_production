@@ -284,92 +284,8 @@ export default function JobCard() {
   return (
     <div style={{ padding: screens.xs ? 8 : 16 }}>
       {/* Print CSS + UI polish */}
-      <style>{`
-        /* antd Segmented blue */
-        .blue-segmented .ant-segmented-item-selected {
-          background: #1677ff !important;
-          color: #fff !important;
-          border-color: #1677ff !important;
-        }
-        .blue-segmented .ant-segmented-thumb { background: #1677ff !important; }
-        .blue-segmented .ant-segmented-item:hover { color: #1677ff; }
+      
 
-        /* PRINT LAYOUT */
-        @page { size: A4 portrait; margin: 8mm; }
-        @media screen { .print-sheet { display: none !important; } }
-        @media print {
-          html, body { margin: 0 !important; padding: 0 !important; }
-          body * { visibility: hidden !important; }                 /* hide all */
-          .print-sheet { display: block !important; }
-          .print-sheet.active,
-          .print-sheet.active * { visibility: visible !important; } /* show only sheet */
-          .print-sheet.active { position: absolute; inset: 0; width: 100%; } /* start at top-left */
-        }
-
-        .print-sheet { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto; color: #000; }
-       .pre-a4 {
-  display: grid;
-  grid-template-rows: auto 1fr 5mm; /* header | main grows | voucher fixed */
-  min-height: calc(297mm - 16mm);    /* full A4 height minus margins */
-}
-
-        .pre-wrap { padding: 4mm; }
-        .pre-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm; }
-        .box { border: 1px solid #111; padding: 2.5mm; border-radius: 1mm; }
-        .tiny { font-size: 11px; }
-        .label { font-weight: 600; }
-        .title-kn {
-  font-size: 16pt;
-  font-weight: 600;
-  letter-spacing: 0.2px;
-  
-}
-
-.title-en {
-  font-size: 25pt;
-  font-weight: 700;
-  margin-top: 2px;
-  
-}
-  .title-wrap {
-  display: flex;
-  align-items: baseline;   /* keeps Kannada big and English aligned nicely */
-  gap: 8px;                /* space between Kannada and English */
-  white-space: nowrap;     /* prevent line break */
-}
-
-        .row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2mm; }
-        .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2mm; }
-        .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm; }
-        .right { text-align: right; }
-        .center { text-align: center; }
-        .v-top { align-self: start; }
-        .damage-box {
-          border: 1px solid #111;
-          padding: 2mm;
-          min-width: 38mm;
-        }
-        .damage-box .title { font-weight: 700; font-size: 12px; }
-        .damage-item { margin: 1mm 0; }
-        .obs-cost {
-          display: grid;
-          grid-template-columns: 1fr 40mm; /* observation | cost column */
-          gap: 2mm;
-        }
-        .list { padding-left: 4mm; margin: 0; }
-        .list li { margin: 0.8mm 0; }
-        .sum-row { display: grid; grid-template-columns: 1fr 40mm; gap: 2mm; align-items: center; }
-        .divider { border-top: 1px solid #000; margin: 3mm 0; }
-        .voucher {
-  border-top: 1px dashed #777;
-  padding-top: 3mm;
-  display: grid;
-  grid-template-columns: auto;
-  gap: 3mm;
-  /* height comes from grid row (35mm) */
-}
-
-      `}</style>
 
       {/* Screen UI (hidden when printing) */}
       <div className="no-print">
@@ -472,21 +388,31 @@ export default function JobCard() {
                 </Form.Item>
               </Col>
 
-              <Col xs={12} sm={3}>
-                <Form.Item
-                  label="KM / Odo"
-                  name="km"
-                  rules={[{ required: true, message: "Please enter KM / Odo" }]}
-                >
-                  <Input
-                    style={{ width: "100%" }}
-                    maxLength={6}
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    onKeyPress={handleKmKeyPress}
-                  />
-                </Form.Item>
-              </Col>
+             <Col xs={12} sm={4}>
+  <Form.Item
+    label="Odometer Reading"
+    name="km"
+    rules={[{ required: true, message: "Please enter Odometer Reading" }]}
+    getValueFromEvent={(e) => {
+      const val = e.target.value.replace(/\D/g, ""); // allow only digits
+      return val ? `${val} KM` : "";                 // append KM if not empty
+    }}
+    getValueProps={(value) => ({
+      value: value?.toString().replace(/\D/g, ""),   // strip KM for input box
+    })}
+  >
+    <Input
+      style={{ width: "100%" }}
+      maxLength={6}
+      inputMode="numeric"
+      pattern="[0-9]*"
+      onKeyPress={handleKmKeyPress}
+      placeholder="Enter KM"
+      suffix="KM"
+    />
+  </Form.Item>
+</Col>
+
             </Row>
 
             <Row gutter={12}>
@@ -696,13 +622,15 @@ export default function JobCard() {
       </div>
 
       {/* ============== PRINT SHEETS (now split into components) ============== */}
-      <PreServiceSheet
-        active={printMode === "pre"}
-        vals={vals}
-        labourRows={labourRows}
-        totals={totals}
-        observationLines={observationLines}
-      />
+     <PreServiceSheet
+  active={printMode === "pre"}
+  vals={vals}
+  labourRows={labourRows}
+  totals={totals}
+  observationLines={observationLines}
+  executives={EXECUTIVES}   // 👈 pass it here
+/>
+
 
       <PostServiceSheet
         active={printMode === "post"}
