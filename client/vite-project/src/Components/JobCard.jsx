@@ -6,8 +6,6 @@ import {
 } from "antd";
 import dayjs from "dayjs";
 
-// ⬇️ If JobCard.jsx sits in the same folder as the two files, keep these paths.
-//    Otherwise change to "../components/PreServiceSheet" etc.
 import PreServiceSheet from "./PreServiceSheet";
 import PostServiceSheet from "./PostServiceSheet";
 
@@ -53,7 +51,7 @@ const SERVICE_TYPES = ["Free", "Paid"]; // shown as checkboxes (single-select en
 const VEHICLE_TYPES = ["Motorcycle","Scooter"]; // tabs
 const MECHANIC = ["Sonu", "ManMohan", "Mansur", "Irshad"];
 
-// NEW: Fuel Level (tabs)
+// Fuel Level (tabs)
 const FUEL_LEVELS = ["Empty", "¼", "½", "¾", "Full"];
 
 // Labour defaults + price book
@@ -80,7 +78,7 @@ const PRICE_BOOK = {
 };
 
 /* =========================
-   UTILS (local to this file)
+   UTILS
    ========================= */
 
 function parseCSV(text) {
@@ -120,9 +118,7 @@ async function getNextJobCardNo() {
   return dayjs().format("YYMMDDHHmmss");
 }
 
-/* ========= Vehicle No. mask =========
-   Type 10 alphanumerics → auto spaces → 12 incl. spaces
-   Example: KA05DB6000 => KA05 DB 6000 */
+/* Vehicle No. mask - KA05 DB 6000 */
 function formatReg(raw) {
   const alnum = (raw || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
   let out = "";
@@ -170,21 +166,18 @@ export default function JobCard() {
       branch: BRANCHES[0],
       executive: undefined,
       mechanic: "",
-      // NEW toggles/segments
-      serviceType: undefined,    // mirrored from serviceTypeLocal for Form
-      vehicleType: undefined,    // mirrored from vehicleTypeLocal for Form
-      floorMat: undefined,       // only for Scooter
-      fuelLevel: undefined,      // tabs (Segmented)
-      // Vehicle & customer
+      serviceType: undefined,
+      vehicleType: undefined,
+      floorMat: undefined,
+      fuelLevel: undefined,
       regNo: "",
       model: "",
       colour: "",
       km: undefined,
       custName: "",
       custMobile: "",
-      callStatus: undefined,     // optional text
+      callStatus: undefined,
       obs: "",
-      // Labour editor defaults
       labourRows: [],
       gstLabour: DEFAULT_GST_LABOUR,
       discounts: { labour: 0 },
@@ -208,29 +201,10 @@ export default function JobCard() {
     form.setFieldsValue({ regNo: next });
   };
 
-  // Watchers for labour auto-fill
+  // Watchers for totals
   const labourRows = Form.useWatch("labourRows", form) || [];
   const gstLabour = Form.useWatch("gstLabour", form) ?? DEFAULT_GST_LABOUR;
   const discounts = Form.useWatch("discounts", form) || { labour: 0 };
-  const serviceType = serviceTypeLocal;
-  const vehicleType = vehicleTypeLocal;
-
-  // Auto-fill labour rows when type changes
-  useEffect(() => {
-    const auto = buildRows(serviceType, vehicleType);
-    const current = labourRows?.map((r) => `${r?.desc}|${r?.qty}|${r?.rate}`) || [];
-    const next = auto.map((r) => `${r?.desc}|${r?.qty}|${r?.rate}`);
-    const same = current.length === next.length && current.every((v, i) => v === next[i]);
-    if (!same) form.setFieldsValue({ labourRows: auto });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serviceType, vehicleType]);
-
-  // If vehicle is not Scooter, clear Floor Mat value (since it applies only to Scooters)
-  useEffect(() => {
-    if (vehicleTypeLocal !== "Scooter") {
-      form.setFieldsValue({ floorMat: undefined });
-    }
-  }, [vehicleTypeLocal, form]);
 
   // Totals
   const totals = useMemo(() => {
@@ -247,7 +221,7 @@ export default function JobCard() {
   // KM input: only digits, max 6
   const handleKmKeyPress = (e) => { if (!/[0-9]/.test(e.key)) e.preventDefault(); };
 
-  // Mobile input: only digits, exactly 10 (blocks others)
+  // Mobile input: only digits, exactly 10
   const handleMobileKeyPress = (e) => { if (!/[0-9]/.test(e.key)) e.preventDefault(); };
   const handleMobileChange = (e) => {
     const val = e.target.value;
@@ -258,17 +232,42 @@ export default function JobCard() {
 
   // Service Type UI: checkboxes but single-select enforced
   const serviceOptions = SERVICE_TYPES.map((t) => ({ label: t, value: t }));
+
+  // 👇 DEFAULT VEHICLE = "Motorcycle" when service is chosen, and populate rows immediately
   const handleServiceCheckbox = (checkedValues) => {
     const last = checkedValues[checkedValues.length - 1] || null;
+
     setServiceTypeLocal(last || null);
     form.setFieldsValue({ serviceType: last || undefined });
+
+    if (last) {
+      const defaultVehicle = "Motorcycle";
+      setVehicleTypeLocal(defaultVehicle);
+      form.setFieldsValue({
+        vehicleType: defaultVehicle,
+        floorMat: undefined, // Scooter-only
+        labourRows: buildRows(last, defaultVehicle),
+        gstLabour: DEFAULT_GST_LABOUR,
+        discounts: { labour: 0 },
+      });
+      message.success(`Applied preset: ${last} / ${defaultVehicle}`);
+    } else {
+      form.setFieldsValue({ labourRows: [] });
+    }
   };
   const serviceValueForUI = serviceTypeLocal ? [serviceTypeLocal] : [];
 
+  // If vehicle is not Scooter, clear Floor Mat
+  useEffect(() => {
+    if (vehicleTypeLocal !== "Scooter") {
+      form.setFieldsValue({ floorMat: undefined });
+    }
+  }, [vehicleTypeLocal, form]);
+
   // PRINT handling
   const handlePrint = (which) => {
-    setPrintMode(which);                  // show the right print sheet
-    setTimeout(() => window.print(), 30); // allow DOM to flip classes
+    setPrintMode(which);
+    setTimeout(() => window.print(), 30);
     setTimeout(() => setPrintMode(null), 800);
   };
 
@@ -283,10 +282,6 @@ export default function JobCard() {
 
   return (
     <div style={{ padding: screens.xs ? 8 : 16 }}>
-      {/* Print CSS + UI polish */}
-      
-
-
       {/* Screen UI (hidden when printing) */}
       <div className="no-print">
         <Card size="small" bordered>
@@ -388,31 +383,30 @@ export default function JobCard() {
                 </Form.Item>
               </Col>
 
-             <Col xs={12} sm={4}>
-  <Form.Item
-    label="Odometer Reading"
-    name="km"
-    rules={[{ required: true, message: "Please enter Odometer Reading" }]}
-    getValueFromEvent={(e) => {
-      const val = e.target.value.replace(/\D/g, ""); // allow only digits
-      return val ? `${val} KM` : "";                 // append KM if not empty
-    }}
-    getValueProps={(value) => ({
-      value: value?.toString().replace(/\D/g, ""),   // strip KM for input box
-    })}
-  >
-    <Input
-      style={{ width: "100%" }}
-      maxLength={6}
-      inputMode="numeric"
-      pattern="[0-9]*"
-      onKeyPress={handleKmKeyPress}
-      placeholder="Enter KM"
-      suffix="KM"
-    />
-  </Form.Item>
-</Col>
-
+              <Col xs={12} sm={4}>
+                <Form.Item
+                  label="Odometer Reading"
+                  name="km"
+                  rules={[{ required: true, message: "Please enter Odometer Reading" }]}
+                  getValueFromEvent={(e) => {
+                    const val = e.target.value.replace(/\D/g, "");
+                    return val ? `${val} KM` : "";
+                  }}
+                  getValueProps={(value) => ({
+                    value: value?.toString().replace(/\D/g, ""),
+                  })}
+                >
+                  <Input
+                    style={{ width: "100%" }}
+                    maxLength={6}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    onKeyPress={handleKmKeyPress}
+                    placeholder="Enter KM"
+                    suffix="KM"
+                  />
+                </Form.Item>
+              </Col>
             </Row>
 
             <Row gutter={12}>
@@ -492,13 +486,19 @@ export default function JobCard() {
                         if (val !== "Scooter") {
                           form.setFieldsValue({ floorMat: undefined });
                         }
+                        if (serviceTypeLocal) {
+                          form.setFieldsValue({
+                            labourRows: buildRows(serviceTypeLocal, val), // live switch
+                            gstLabour: DEFAULT_GST_LABOUR,
+                            discounts: { labour: 0 },
+                          });
+                        }
                       }}
                     />
                   </Form.Item>
                 </Col>
               )}
 
-              {/* Floor Mat only for Scooter */}
               {vehicleTypeLocal === "Scooter" && (
                 <Col xs={24} md={4}>
                   <Form.Item
@@ -577,7 +577,6 @@ export default function JobCard() {
                     );
                   })}
 
-                  {/* New rows start with qty = 1 */}
                   <Button onClick={() => add({ qty: 1 })}>Add labour</Button>
                 </>
               )}
@@ -621,16 +620,15 @@ export default function JobCard() {
         </Form>
       </div>
 
-      {/* ============== PRINT SHEETS (now split into components) ============== */}
-     <PreServiceSheet
-  active={printMode === "pre"}
-  vals={vals}
-  labourRows={labourRows}
-  totals={totals}
-  observationLines={observationLines}
-  executives={EXECUTIVES}   // 👈 pass it here
-/>
-
+      {/* PRINT SHEETS */}
+      <PreServiceSheet
+        active={printMode === "pre"}
+        vals={vals}
+        labourRows={labourRows}
+        totals={totals}
+        observationLines={observationLines}
+        executives={EXECUTIVES}
+      />
 
       <PostServiceSheet
         active={printMode === "post"}
