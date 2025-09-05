@@ -8,7 +8,6 @@ export default function PostServiceSheet({ active, vals }) {
     sn: idx + 1,
     particulars: r?.desc || "-",
     qty: Number(r?.qty || 0),
-    unit: r?.unit || "Nos",
     rate: Number(r?.rate || 0),
     amount: Math.max(0, Number(r?.qty || 0) * Number(r?.rate || 0)),
   }));
@@ -17,9 +16,15 @@ export default function PostServiceSheet({ active, vals }) {
   const gstPct = Number(vals?.gstLabour ?? 0);
   const gstAmt = Math.round(subTotal * (gstPct / 100));
   const grandTotal = Math.max(0, subTotal + gstAmt);
-  const received = Math.max(0, Number(vals?.amountReceived || 0));
-  const balance = Math.max(0, grandTotal - received);
   const grandInWords = amountInWords(grandTotal);
+  // put these just above the return() inside your component render
+const parseKm = (v) => {
+  const digits = String(v ?? "").replace(/\D/g, "");
+  return digits ? parseInt(digits, 10) : null;
+};
+const kmVal = parseKm(vals?.km);
+const nextServiceKm = kmVal != null ? kmVal + 2000 : null;
+
 
   return (
     <div className={`print-sheet ${active ? "active" : ""}`}>
@@ -35,7 +40,7 @@ export default function PostServiceSheet({ active, vals }) {
         }
 
         .bill-wrap { padding:4mm; font-family:ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto; color:#000; }
-        .bill-box { border:1px solid #111; border-radius:1mm; padding:3mm; }
+        .bill-box { border:1px solid #000000ff; border-radius:1mm; padding:3mm; }
         .hdr-grid { display:grid; grid-template-columns:28mm 1fr 28mm; align-items:center; gap:3mm; }
         .shop-title { text-align:center; }
         .shop-title .en { font-size:18pt; font-weight:500; line-height:1.05; }
@@ -97,7 +102,9 @@ export default function PostServiceSheet({ active, vals }) {
               <div className="shop-title">
                 <div className="en">SHANTHA MOTORS | ಶಾಂತ ಮೋಟರ್ಸ್</div>
                 <div className="shop-sub">Multi Brand Two Wheeler Sales &amp; Service</div>
+                <div className="shop-sub">Mob No : 9731366921 / 8073283502 </div>
                 <div className="tiny">Kadabagere • Muddinapalya • D-Group Layout • Andrahalli • Tavarekere • Hegganahalli • Channenahalli • Nelagadrahalli</div>
+
               </div>
               <div>
                 <img src="/location-qr.png" alt="Location QR" style={{ width:"100%", maxHeight:100 }} />
@@ -106,11 +113,14 @@ export default function PostServiceSheet({ active, vals }) {
             </div>
 
             <div className="id-grid">
-              <div><span className="label">Invoice No:</span> {vals.jcNo || "-"}</div>
-              <div><span className="label">Date:</span> {fmtDate(vals?.createdAt)}</div>
-              <div><span className="label">Vehicle No:</span> {vals?.regNo || "-"}</div>
-              <div><span className="label">Bill To (Customer):</span> {vals?.custName || "-"}</div>
+                <div><span className="label">Bill To (Customer):</span> {vals?.custName || "-"}</div>
+                <div><span className="label">Invoice No:</span> {vals?.jcNo || "-"}</div>
+                <div><span className="label">Vehicle No:</span> {vals?.regNo || "-"}</div>
+                <div><span className="label">Date:</span> {fmtDate(vals?.createdAt)}</div>
+                <div><span className="label">Odometer Reading:</span> {kmVal != null ? `${kmVal} KM` : "-"}</div>
+                <div><span className="label">Next Service:</span> {nextServiceKm != null ? `${nextServiceKm} KM` : "-"}</div>
             </div>
+
 
             <table className="tbl">
               <thead>
@@ -118,8 +128,7 @@ export default function PostServiceSheet({ active, vals }) {
                   <th style={{ width:"8mm" }}>S/N</th>
                   <th>Particulars</th>
                   <th style={{ width:"20mm" }}>Qty</th>
-                  <th style={{ width:"22mm" }}>Unit</th>
-                  <th style={{ width:"28mm" }}>Price/Unit</th>
+                  <th style={{ width:"28mm" }}>Price</th>
                   <th style={{ width:"30mm" }}>Amount</th>
                 </tr>
               </thead>
@@ -131,7 +140,6 @@ export default function PostServiceSheet({ active, vals }) {
                     <td className="center">{r.sn}</td>
                     <td>{r.particulars}</td>
                     <td className="center">{r.qty}</td>
-                    <td className="center">{r.unit}</td>
                     <td className="right">{inr(r.rate)}</td>
                     <td className="right">{inr(r.amount)}</td>
                   </tr>
@@ -152,14 +160,7 @@ export default function PostServiceSheet({ active, vals }) {
                   <div className="cell label">Grand Total</div>
                   <div className="cell value">{inr(grandTotal)}</div>
                 </div>
-                <div className="sum-pair">
-                  <div className="cell label">Total Received</div>
-                  <div className="cell value">{inr(received)}</div>
-                </div>
-                <div className="sum-pair">
-                  <div className="cell label">Balance</div>
-                  <div className="cell value">{inr(balance)}</div>
-                </div>
+                
               </div>
             </div>
 
@@ -181,14 +182,10 @@ export default function PostServiceSheet({ active, vals }) {
                 For Shantha Motors<br/>Authorised Signatory
               </div>
             </div>
-          </div>
-        </div>
-
-        <div className="bill-wrap">
-          <div className="bill-box center tiny">
-            <div style={{ fontWeight:700 }}>Thank you for your business — please visit again.</div>
+           <div className=" center tiny">
+            <div style={{ fontWeight:700, fontSize:16 }}>Thank you for your business — please visit again.</div>
             <div>Ride Smooth. Ride Safe.</div>
-            <div>Shantha Motors • 9731366921 • 8073283502 • shanthamotorsblr@gmail.com</div>
+          </div>
           </div>
         </div>
       </div>
