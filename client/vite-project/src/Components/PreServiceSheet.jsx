@@ -5,7 +5,7 @@ export default function PreServiceSheet({
   active,           // boolean -> printMode === 'pre'
   vals,             // form values (JobCard.jsx already has this) 
   labourRows,       // array of {desc, qty, rate}
-
+   executives = [], 
   observationLines, // built in JobCard.jsx
 }) {
   // --- Helpers to align observations with labour rows and compute amounts ---
@@ -43,6 +43,23 @@ export default function PreServiceSheet({
     return digits ? `${digits} KM` : "-";
   };
 
+  const HSpace = ({ w = "8mm" }) => (
+  <span aria-hidden="true" style={{ display: "inline-block", width: w }} />
+);
+
+const execPhone = (() => {
+  // line explains: normalize whatever is stored in vals.executive
+  const raw = String(vals?.executive || "").trim();
+  // line explains: if the value already looks like a 10-digit number, use it directly
+  const asDigits = raw.replace(/\D/g, "");
+  if (/^\d{10}$/.test(asDigits)) return asDigits;
+  // line explains: otherwise match the name against the EXECUTIVES array and return the phone
+  const match = (executives || []).find((e) => e.name === raw);
+  return match?.phone || null;   // line explains: null → will render "-" later
+})();
+
+
+
   return (
     <div className={`print-sheet ${active ? "active" : ""}`}>
       <style>{`
@@ -56,7 +73,7 @@ export default function PreServiceSheet({
 .blue-segmented .ant-segmented-item:hover { color: #1677ff; }
 
 /* PRINT LAYOUT */
-@page { size: A4 portrait; margin: 8mm; }
+@page { size: A4 portrait; margin: 0mm; }
 @media screen { .print-sheet { display: none !important; } }
 @media print {
   html, body { margin: 0 !important; padding: 0 !important; }
@@ -84,9 +101,7 @@ export default function PreServiceSheet({
 
 /* Page grid: header | main | voucher(≈1/8 A4) */
 .pre-a4 {
-  display: grid;
-  grid-template-rows: auto 1fr 35mm;   /* header | main grows | voucher fixed */
-  min-height: calc(297mm - 16mm);      /* full A4 height minus margins (screen only; canceled on print) */
+      /* full A4 height minus margins (screen only; canceled on print) */
 }
 
 /* Content paddings */
@@ -99,7 +114,7 @@ export default function PreServiceSheet({
 .label { font-weight: 600; }
 
 /* Titles (one line) */
-.title-kn { font-size: 16pt; font-weight: 600; letter-spacing: 0.2px; }
+.title-kn { font-size: 18pt; font-weight: 500; letter-spacing: 1px; }
 .title-en { font-size: 25pt; font-weight: 700; margin-top: 2px; }
 .title-wrap {
   display: flex;
@@ -110,7 +125,7 @@ export default function PreServiceSheet({
 
 /* Grids */
 .row   { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2mm; }
-.row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr;   gap: 2mm; }
+.row-3 { display: grid; grid-template-columns: 2fr 1fr;   gap: 2mm; }
 .row-2 { display: grid; grid-template-columns: 1fr 1fr;       gap: 2mm; }
 
 .right { text-align: right; }
@@ -144,16 +159,16 @@ export default function PreServiceSheet({
   gap: 8px;
   white-space: nowrap;         /* keep Kannada + English on one line */
 }
-.voucher .brand-kn{ font-size: 16pt; font-weight: 600; }
-.voucher .brand-en{ font-size: 20pt; font-weight: 700; letter-spacing: 0.3px; }
+.voucher .brand-kn{ font-size:18pt; font-weight:500; line-height:1.05; }
+.voucher .brand-en{ font-size:18pt; font-weight:500; line-height:1.05; }
 
 /* Single outer box inside voucher with 3 columns: left | middle | right(=QR) */
 .voucher .box {
-  width: 100%;
+  width: 98%;
    border: 1px solid #111;
   border-radius: 5mm;
   display: grid;
-  grid-template-columns: 0.8fr 0.8fr 0.5fr;  /* fixed right column for QR */
+  grid-template-columns: 0.7fr 0.9fr 0.5fr;  /* fixed right column for QR */
   gap: 3mm;
   align-items: start;
   text-align: left;
@@ -199,7 +214,7 @@ export default function PreServiceSheet({
 .note-title { font-weight: 600; margin-bottom: 1.5mm; }
 .note-area {
   border: 1px solid #111;
-  height: 35mm;
+  height: 45mm;
   border-radius: 1mm;
 }
 `}</style>
@@ -247,7 +262,7 @@ export default function PreServiceSheet({
             <div className="box">
               <div className="row-2">
                 <div><span className="label">Model:</span> {vals.model || "-"}</div>
-                <div><span className="label">Color:</span> {vals.colour || "-"}</div>
+               
               </div>
             </div>
             <div className="box"><span className="label">Expected Delivery Date:</span> {fmtDate(vals.expectedDelivery)}</div>
@@ -258,6 +273,8 @@ export default function PreServiceSheet({
             <div style={{ display: "flex", gap: "6mm" }}>
               <div>{tick(vals.serviceType === "Free")} Free</div>
               <div>{tick(vals.serviceType === "Paid")} Paid</div>
+              <HSpace w="50mm" />
+             <div><span className="label">Color:</span> {vals.colour || "-"}</div>
             </div>
           </div>
 
@@ -350,10 +367,9 @@ export default function PreServiceSheet({
           </div>
 
           {/* Customer name / mobile / call status */}
-          <div className="row-3" style={{ marginTop: 3 }}>
-            <div className="box"><span className="label">Customer Name:</span> {vals.custName || "-"}</div>
-            <div className="box"><span className="label">Mobile No:</span> {vals.custMobile || "-"}</div>
-            <div className="box"><span className="label">Call Status:</span> {vals.callStatus || "-"}</div>
+          <div className="row-3 box" style={{ marginTop: 3 }}>
+            <div ><span className="label">Customer Name:</span> {vals.custName || "-"}</div>
+            <div ><span className="label">Mobile No:</span> {vals.custMobile || "-"}</div>
           </div>
         </div>
 
@@ -378,8 +394,9 @@ export default function PreServiceSheet({
     {/* MIDDLE: Date / Executive No / Approx amount */}
     <div className="col">
       <div><span className="label">Date:</span> {fmtDate(vals?.createdAt)}</div>
-      <div><span className="label">Executive No:</span> {vals?.executive || "-"}</div>
-      <div><span className="label">Apprx. Service Amount:</span> {inr(vals?.estimatedTotal ?? 0)}</div>
+     <div><span className="label">Executive No:</span> {execPhone || "-"}</div>
+      <div><span className="label">Apprx. Service Amount:</span> {inr(estimatedTotal)}</div>
+
     </div>
 
     {/* RIGHT: QR + caption (phones optional; remove if not needed) */}
