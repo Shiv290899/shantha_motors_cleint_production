@@ -1,15 +1,14 @@
-// QuotationOnePage.jsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+// Quotation.jsx
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Row, Col, Form, Input, InputNumber, Select, Button, Radio, message, Checkbox, Switch,
 } from "antd";
-import { PrinterOutlined } from "@ant-design/icons";
+import PrintQuotation from "./PrintQuotation";
 
 /* ======================
    GOOGLE FORM INTEGRATION
    ====================== */
 const GFORM_ID = "1FAIpQLSf12moQr3-6sXFvF4FbA_9h94gwIz-dW_QbT-yFlVsa2wYByg";
-
 const ENTRY = {
   name: "entry.1495914891",
   phone: "entry.606711946",
@@ -19,7 +18,6 @@ const ENTRY = {
   executive: "entry.1594794173",
   remarks: "entry.1055001846",
 };
-
 const RESPONSES_CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vRXJ4xTMWJVv7v-U9SD8R5X2z4Lt0EBUeOOo6_leF-75-gToGJV1yxBk3YUooCtMAJ410quZN7UrhnO/pub?output=csv";
 
@@ -88,10 +86,6 @@ const normalizeSheetRow = (row = {}) => ({
 /* ======================
    CONFIG + STATIC OPTIONS
    ====================== */
-const PROCESSING_FEE = 8000;
-const RATE_LOW = 9;
-const RATE_HIGH = 11;
-
 const EXECUTIVES = [
   { name: "Rukmini", phone: "9901678562" },
   { name: "Meghana", phone: "7019974219" },
@@ -105,33 +99,9 @@ const EXECUTIVES = [
   { name: "Shubha", phone: "8971585057" },
   { name: "Vanitha", phone: "9380729861" },
 ];
-
-const SCOOTER_OPTIONS = [
-  "All Round Guard",
-  "Side Stand",
-  "Saree Guard",
-  "Grip Cover",
-  "Seat Cover",
-  "Floor Mat",
-  "ISI Helmet",
-];
-
-const MOTORCYCLE_OPTIONS = [
-  "Crash Guard",
-  "Engine Guard",
-  "Tank Cover",
-  "Ladies Handle",
-  "Gripper",
-  "Seat Cover",
-];
-
-const DOCS_REQUIRED = [
-  "Aadhar Card",
-  "Pan Card",
-  "Bank Passbook",
-  "ATM Card",
-  "Local Address Proof",
-];
+const SCOOTER_OPTIONS = ["All Round Guard","Side Stand","Saree Guard","Grip Cover","Seat Cover","Floor Mat","ISI Helmet"];
+const MOTORCYCLE_OPTIONS = ["Crash Guard","Engine Guard","Tank Cover","Ladies Handle","Gripper","Seat Cover"];
+const DOCS_REQUIRED = ["Aadhar Card","Pan Card","Bank Passbook","ATM Card","Local Address Proof"];
 
 /* ======================
    HELPERS
@@ -140,14 +110,6 @@ const phoneRule = [
   { required: true, message: "Mobile number is required" },
   { pattern: /^[6-9]\d{9}$/, message: "Enter a valid 10-digit Indian mobile number" },
 ];
-
-const inr0 = (n) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(Math.max(0, Math.round(n || 0)));
-
 const toE164India = (raw) => {
   const digits = String(raw || "").replace(/\D/g, "");
   const noLeadZero = digits.replace(/^0+/, "");
@@ -191,13 +153,13 @@ const submitToGoogleForm = (entries) => {
 };
 
 const toEntries = (v, executiveName) => ({
-  [ENTRY.name]: v.name ?? "",
-  [ENTRY.phone]: v.mobile ?? "",
-  [ENTRY.company]: v.company ?? "",
-  [ENTRY.model]: v.bikeModel ?? "",
-  [ENTRY.variant]: v.variant ?? "",
-  [ENTRY.executive]: executiveName ?? "",
-  [ENTRY.remarks]: v.remarks ?? "",
+  ["entry.1495914891"]: v.name ?? "",
+  ["entry.606711946"]: v.mobile ?? "",
+  ["entry.561486211"]: v.company ?? "",
+  ["entry.772364163"]: v.bikeModel ?? "",
+  ["entry.219611581"]: v.variant ?? "",
+  ["entry.1594794173"]: executiveName ?? "",
+  ["entry.1055001846"]: v.remarks ?? "",
 });
 
 /* ======================
@@ -213,7 +175,9 @@ async function getNextSerial() {
         const count = Math.max(0, rows.length - 1);
         return String(count + 1);
       }
-    } catch { /* fallback */ }
+    } catch {
+      //ignpre
+    }
   }
   const key = `SM_QUOTE_COUNTER_SIMPLE`;
   const current = Number(localStorage.getItem(key) || "0") + 1;
@@ -228,7 +192,6 @@ export default function Quotation() {
   const [form] = Form.useForm();
 
   const [brand, setBrand] = useState("SHANTHA"); // "SHANTHA" | "NH"
-
   const [bikeData, setBikeData] = useState([]);
   const [company, setCompany] = useState("");
   const [model, setModel] = useState("");
@@ -239,13 +202,7 @@ export default function Quotation() {
   const [sheetOk, setSheetOk] = useState(false);
 
   const [mode, setMode] = useState("cash");
-
   const [emiSet, setEmiSet] = useState("12");
-  const tenures = useMemo(
-    () => (emiSet === "12" ? [12, 18, 24, 30] : [24, 30, 36, 48]),
-    [emiSet]
-  );
-
   const [downPayment, setDownPayment] = useState(0);
 
   const [vehicleType, setVehicleType] = useState("scooter");
@@ -254,44 +211,19 @@ export default function Quotation() {
 
   const executiveName = Form.useWatch("executive", form) || EXECUTIVES[0].name;
 
-  const pageRef = useRef(null);
-  const printDate = useMemo(() => {
-    const d = new Date();
-    const dd = String(d.getDate()).padStart(2, "0");
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const yyyy = d.getFullYear();
-    return `${dd}/${mm}/${yyyy}`;
-  }, []);
-
-  // --- Updated cache-busting helper (faster on mobile) ---
-  const ASSET_VERSION = "1"; // bump only if remote assets change
-  const absBust = (p) => {
-    if (!p) return "";
-    const url = p.startsWith("http") ? p : new URL(p, window.location.origin).href;
-    const isLocal = url.startsWith(window.location.origin);
-    if (isLocal) return url; // keep cached for speed
-    return url.includes("?") ? `${url}&v=${ASSET_VERSION}` : `${url}?v=${ASSET_VERSION}`;
-  };
-
   useEffect(() => {
     (async () => {
       try {
         const raw = await fetchSheetRowsCSV(SHEET_CSV_URL);
-        const cleaned = raw
-          .map(normalizeSheetRow)
-          .filter((r) => r.company && r.model && r.variant);
+        const cleaned = raw.map(normalizeSheetRow).filter((r) => r.company && r.model && r.variant);
         if (!cleaned.length) {
           message.warning("Sheet loaded but no valid rows. Switching to manual entry.");
-          setManual(true);
-          setSheetOk(false);
-          return;
+          setManual(true); setSheetOk(false); return;
         }
-        setBikeData(cleaned);
-        setSheetOk(true);
+        setBikeData(cleaned); setSheetOk(true);
       } catch {
         message.warning("Could not load vehicle sheet. Switched to manual entry.");
-        setManual(true);
-        setSheetOk(false);
+        setManual(true); setSheetOk(false);
       }
     })();
   }, []);
@@ -299,9 +231,7 @@ export default function Quotation() {
   useEffect(() => {
     (async () => {
       const serial = await getNextSerial();
-      if (!form.getFieldValue("serialNo")) {
-        form.setFieldsValue({ serialNo: serial });
-      }
+      if (!form.getFieldValue("serialNo")) form.setFieldsValue({ serialNo: serial });
     })();
   }, [form]);
 
@@ -313,20 +243,13 @@ export default function Quotation() {
     }
   }, [vehicleType]);
 
-  const companies = useMemo(
-    () => [...new Set(bikeData.map((r) => r.company))],
-    [bikeData]
-  );
+  const companies = useMemo(() => [...new Set(bikeData.map((r) => r.company))], [bikeData]);
   const models = useMemo(
     () => [...new Set(bikeData.filter((r) => r.company === company).map((r) => r.model))],
     [bikeData, company]
   );
   const variants = useMemo(
-    () => [
-      ...new Set(
-        bikeData.filter((r) => r.company === company && r.model === model).map((r) => r.variant)
-      ),
-    ],
+    () => [...new Set(bikeData.filter((r) => r.company === company && r.model === model).map((r) => r.variant))],
     [bikeData, company, model]
   );
 
@@ -341,254 +264,42 @@ export default function Quotation() {
     }
   };
 
-  const dpPct = onRoadPrice > 0 ? downPayment / onRoadPrice : 0;
-  const rate = dpPct >= 0.3 ? RATE_LOW : RATE_HIGH;
-
-  const monthlyFor = (months) => {
-    const base = Math.max(Number(onRoadPrice || 0) - Number(downPayment || 0), 0);
-    const principal = base + PROCESSING_FEE;
-    const years = months / 12;
-    const totalInterest = principal * (rate / 100) * years;
-    const total = principal + totalInterest;
-    return months > 0 ? total / months : 0;
-  };
-
-  // ---------- Android/iOS-proof A4 print ----------
-  const handlePrint = async () => {
-    try {
-      await form.validateFields([
-        "serialNo", "name", "mobile", "address",
-        "company", "bikeModel", "variant", "onRoadPrice",
-      ]);
-    } catch {
-      message.warning("Fix the highlighted fields before printing.");
-      return;
-    }
-
-    const page = pageRef.current;
-    if (!page) { window.print(); return; }
-
-    // Ensure latest React commit is flushed
-    await new Promise((r) => setTimeout(r, 0));
-
-    const cloned = page.cloneNode(true);
-
-    // Make all image URLs absolute + cache-busted (avoid stale Android preview)
-    cloned.querySelectorAll("img").forEach((img) => {
-      const src = img.getAttribute("src");
-      if (src) img.setAttribute("src", absBust(src));
-    });
-
-    // --- Stricter A4 page with safe inner padding & mobile typography caps ---
-    const PRINT_STYLES = `
-      @page { size: A4 portrait; margin: 8mm; }
-      @viewport { width: device-width; }
-
-      html, body {
-        margin: 0 !important;
-        padding: 0 !important;
-        background: #fff !important;
-        -webkit-text-size-adjust: 100% !important;
-        text-size-adjust: 100% !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-        width: 210mm;
-        min-height: 297mm;
-      }
-
-      * { box-sizing: border-box; }
-
-      .page {
-        width: 194mm;           /* 210 - (8+8)mm margins */
-        min-height: 281mm;      /* 297 - (8+8)mm margins */
-        padding: 10mm;
-        margin: 0 auto;
-        background: #fff !important;
-        page-break-after: always;
-        overflow: visible !important;
-      }
-
-      .sheet {
-        width: 100%;
-        font: 11.5pt/1.32 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-        color: #111;
-        background: #fff !important;
-      }
-
-      .row2 { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 8px 14px; }
-      .row3 { display: grid; grid-template-columns: 0.6fr 0.8fr 1fr; gap: 8px 14px; }
-      .box { border: 2px solid #000; border-radius: 6px; padding: 8px 10px; background: #fff; }
-      .plist { margin: 0; padding-left: 16px; }
-      .plist li { margin: 0 0 2px; }
-      .big-price { font-size: 15pt; font-weight: 900; }
-      .title-kn { font-size: 34pt; font-weight: 900; letter-spacing: .2px; }
-      .title-knhonda { font-size: 28pt; font-weight: 900; letter-spacing: .2px; }
-      .title-en { font-size: 18pt; font-weight: 800; margin-top: 2px; }
-      .addr-line, .addr-linehonda { font-size: 10.5pt; }
-
-      .hdr-line { display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px; }
-      .hdr-title { flex: 1; display:flex; justify-content:center; }
-      .quo-box { font-size: 16pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; display:inline-block; }
-      .hdr-right { text-align: right; font-weight: 600; font-size: 10.5pt; }
-      .emibox { border: 2px solid #000; border-radius: 8px; padding: 6px 10px; text-align: center; }
-      .section-title { font-size: 13pt; font-weight: 900; margin-bottom: 4px; }
-
-      img { max-width: 100%; height: auto; background: transparent; image-rendering: -webkit-optimize-contrast; }
-
-      @media print {
-        .brand-right img { max-height: 120mm; height: 60mm; }
-      }
-
-      @media print and (max-width: 800px) {
-        .title-kn { font-size: 28pt; }
-        .title-knhonda { font-size: 24pt; }
-        .title-en { font-size: 16pt; }
-        .big-price { font-size: 14pt; }
-        .addr-line, .addr-linehonda, .hdr-right { font-size: 10pt; }
-        .row3 { grid-template-columns: 0.7fr 0.9fr 1fr; }
-        .page { padding: 8mm; }
-      }
-
-      @media screen { .no-print { display: none; } }
-    `;
-
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.right = "0";
-    iframe.style.bottom = "0";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
-    iframe.style.border = "0";
-    iframe.setAttribute("aria-hidden", "true");
-    document.body.appendChild(iframe);
-
-    const win = iframe.contentWindow;
-    const doc = win.document;
-
-    doc.open();
-    doc.write(`
-      <!doctype html>
-      <html>
-      <head>
-        <meta charset="utf-8"/>
-        <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
-        <title>Quotation</title>
-        <style>${PRINT_STYLES}</style>
-      </head>
-      <body>
-        <div class="print-wrap"></div>
-      </body>
-      </html>
-    `);
-    doc.close();
-
-    const mount = doc.querySelector(".print-wrap");
-    mount.appendChild(cloned);
-
-    const waitForAssets = async () => {
-      const imgs = Array.from(doc.images || []);
-      await Promise.all(
-        imgs.map(img =>
-          (img.complete && img.naturalWidth)
-            ? Promise.resolve()
-            : new Promise(res => { img.onload = img.onerror = () => res(); })
-        )
-      );
-      if (doc.fonts && doc.fonts.ready) { try { await doc.fonts.ready; } catch {
-        //ignore
-      } }
-      // Give Android/iOS compositor a little more settle time
-      await new Promise(res => setTimeout(res, 500));
-    };
-
-    try {
-      await waitForAssets();
-      try { win.focus(); } catch {
-        //i
-      }
-      try { win.print(); } catch { window.print(); }
-    } finally {
-      setTimeout(() => {
-        iframe.parentNode && iframe.parentNode.removeChild(iframe);
-      }, 1000);
-    }
-  };
-
-  // Capture Ctrl/Cmd + P and route to handlePrint
-  useEffect(() => {
-    const onKeyDown = (e) => {
-      const isPrintShortcut =
-        (e.ctrlKey || e.metaKey) && (e.key === "p" || e.key === "P");
-      if (isPrintShortcut) {
-        e.preventDefault();
-        handlePrint();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []); // handlePrint uses stable inner functions/values
-
   const handleSaveToForm = async () => {
     const v = await form.validateFields([
-      "serialNo", "name", "mobile", "address",
-      "company", "bikeModel", "variant", "onRoadPrice", "executive", "remarks",
+      "serialNo","name","mobile","address","company","bikeModel","variant","onRoadPrice","executive","remarks",
     ]);
-
     if (!v.serialNo) {
       const serial = await getNextSerial();
       v.serialNo = serial;
       form.setFieldsValue({ serialNo: serial });
     }
-
     const entries = toEntries(v, executiveName);
     submitToGoogleForm(entries);
-
     return v;
   };
 
   const handleWhatsApp = async () => {
     try {
-      await form.validateFields(["name", "mobile", "company", "bikeModel", "variant"]);
+      await form.validateFields(["name","mobile","company","bikeModel","variant"]);
     } catch {
       message.warning("Please enter Name, Mobile, Company, Model and Variant.");
       return;
     }
 
     let savedOk = true;
-    try {
-      await handleSaveToForm();
-    } catch (err) {
-      savedOk = false;
-      console.warn("Silent save failed (continuing to WhatsApp):", err);
-    }
+    try { await handleSaveToForm(); } catch { savedOk = false; }
 
-    const customerName = (form.getFieldValue("name") || "").trim();
-    const mobileRaw = form.getFieldValue("mobile");
-    const e164 = toE164India(mobileRaw);
-    const companyVal = company || form.getFieldValue("company") || "";
-    const modelVal = model || form.getFieldValue("bikeModel") || "";
-    const variantVal = variant || form.getFieldValue("variant") || "";
-
+    const toE164 = toE164India(form.getFieldValue("mobile"));
     const adminMsg =
       `New quotation details:` +
-      `\nName: ${customerName || "-"}` +
-      `\nMobile: ${e164 ? "+" + e164 : (mobileRaw || "-")}` +
-      `\nVehicle: ${[companyVal, modelVal, variantVal].filter(Boolean).join(" ") || "-"}`;
+      `\nName: ${(form.getFieldValue("name")||"").trim() || "-"}` +
+      `\nMobile: ${toE164 ? "+"+toE164 : (form.getFieldValue("mobile")||"-")}` +
+      `\nVehicle: ${[company||form.getFieldValue("company")||"", model||form.getFieldValue("bikeModel")||"", variant||form.getFieldValue("variant")||""].filter(Boolean).join(" ") || "-"}`;
 
-    const adminNumber = "919731366921";
-    const url = `https://wa.me/${adminNumber}?text=${encodeURIComponent(adminMsg)}`;
-    window.open(url, "_blank");
+    window.open(`https://wa.me/919731366921?text=${encodeURIComponent(adminMsg)}`, "_blank");
 
-    if (savedOk) {
-      message.success("Saved to sheet and opened WhatsApp with details.");
-    } else {
-      message.warning("Could not save to sheet, but WhatsApp was opened with details.");
-    }
-  };
-
-  const PrintList = ({ items }) => {
-    if (!items?.length) return <span>-</span>;
-    return <ul className="plist">{items.map((t) => <li key={t}>{t}</li>)}</ul>;
+    if (savedOk) message.success("Saved to sheet and opened WhatsApp with details.");
+    else message.warning("Could not save to sheet, but WhatsApp was opened with details.");
   };
 
   return (
@@ -600,20 +311,12 @@ export default function Quotation() {
           .brand-row2 { grid-template-columns: 1fr !important; row-gap: 8px; }
           .brand-right { justify-content: flex-start !important; }
         }
-        .print-sheet { display: none; }
-        @media print { .print-sheet { display: block; } .no-print { display: none !important; } }
       `}</style>
 
-      {/* On-screen inputs */}
-      <div className="wrap no-print">
+      <div className="wrap">
         <div className="card">
-          <Form
-            layout="vertical"
-            form={form}
-            initialValues={{ executive: EXECUTIVES[0].name }}
-          >
+          <Form layout="vertical" form={form} initialValues={{ executive: EXECUTIVES[0].name }}>
             <Row gutter={[12, 8]}>
-
               <Col span={24}>
                 <Form.Item label="Brand on Print">
                   <Radio.Group value={brand} onChange={(e)=>setBrand(e.target.value)}>
@@ -633,11 +336,7 @@ export default function Quotation() {
               </Col>
 
               <Col xs={24} md={8}>
-                <Form.Item
-                  label="Quotation No."
-                  name="serialNo"
-                  rules={[{ required: true, message: "Enter quotation no." }]}
-                >
+                <Form.Item label="Quotation No." name="serialNo" rules={[{ required: true, message: "Enter quotation no." }]}>
                   <Input placeholder="Auto-filled (1, 2, 3…)" />
                 </Form.Item>
               </Col>
@@ -771,17 +470,6 @@ export default function Quotation() {
                       </Radio.Group>
                     </Form.Item>
                   </Col>
-
-                  <Col xs={24}>
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                      {tenures.map((mo) => (
-                        <div key={mo} className="emibox" style={{ minWidth: 140 }}>
-                          <div style={{ fontWeight: 700 }}>{mo} months</div>
-                          <div style={{ fontWeight: 900, fontSize: 16 }}>{inr0(monthlyFor(mo))}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </Col>
                 </>
               )}
 
@@ -802,10 +490,7 @@ export default function Quotation() {
 
               <Col xs={24} md={12}>
                 <Form.Item label="Free Extra Fittings (shown on print)">
-                  <Checkbox.Group
-                    value={fittings}
-                    onChange={setFittings}
-                  >
+                  <Checkbox.Group value={fittings} onChange={setFittings}>
                     {(vehicleType === "scooter" ? SCOOTER_OPTIONS : MOTORCYCLE_OPTIONS).map((opt) => (
                       <div key={opt} style={{ marginBottom: 6 }}>
                         <Checkbox value={opt}>{opt}</Checkbox>
@@ -838,250 +523,31 @@ export default function Quotation() {
               {/* Actions */}
               <Col span={24} style={{ textAlign: "right" }}>
                 <Button
-                  className="no-print"
                   onClick={handleWhatsApp}
                   style={{ marginRight: 8, background: "#25D366", color: "#fff", borderColor: "#25D366" }}
                 >
                   WhatsApp
                 </Button>
-                <Button className="no-print" type="primary" icon={<PrinterOutlined />} onClick={handlePrint}>
-                  Print
-                </Button>
+
+                {/* PRINT lives here but renders/owns its own A4 layout internally */}
+                <PrintQuotation
+                  form={form}
+                  brand={brand}
+                  company={company}
+                  model={model}
+                  variant={variant}
+                  onRoadPrice={onRoadPrice}
+                  mode={mode}
+                  downPayment={downPayment}
+                  emiSet={emiSet}
+                  vehicleType={vehicleType}
+                  fittings={fittings}
+                  docsReq={docsReq}
+                  executiveName={executiveName}
+                />
               </Col>
             </Row>
           </Form>
-        </div>
-      </div>
-
-      {/* ---------- PRINT SLIP (A4) ---------- */}
-      <div className="print-sheet">
-        <div className="page" ref={pageRef}>
-          <div className="sheet">
-
-            {/* Header */}
-            <div className="hdr-line">
-              <div style={{ textAlign: "center", marginRight: 12 }}>
-                <img
-                  src={"/location-qr.png"}
-                  alt="Location QR"
-                  style={{ height: 50, objectFit: "contain" }}
-                />
-                <div style={{ fontSize: 8, fontWeight: 600, marginTop: 4 }}>Scan for Location</div>
-              </div>
-
-              <div className="hdr-title">
-                <div className="quo-box">QUOTATION</div>
-              </div>
-
-              <div className="hdr-right">
-                <div>Sl. No.: {form.getFieldValue("serialNo") || "-"}</div>
-                <div>Date: {printDate}</div>
-              </div>
-            </div>
-
-            {/* Brand block */}
-            <div
-              style={{
-                borderBottom: "2px solid #000",
-                paddingBottom: 6,
-                marginBottom: 8,
-                display: "grid",
-                gridTemplateRows: "auto auto",
-                rowGap: 8,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "baseline",
-                  gap: 8,
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {brand === "SHANTHA" ? (
-                  <>
-                    <div className="title-kn" style={{ whiteSpace: "nowrap" }}>
-                      ಶಾಂತ ಮೋಟರ್ಸ್
-                    </div>
-                    <div className="title-en" style={{ whiteSpace: "nowrap" }}>
-                      Shantha Motors
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="title-knhonda" style={{ whiteSpace: "nowrap" }}>
-                      ಎನ್ ಎಚ್ ಮೋಟರ್ಸ್
-                    </div>
-                    <div className="title-en" style={{ whiteSpace: "nowrap" }}>
-                      NH Motors
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <div
-                className="brand-row2"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr auto",
-                  columnGap: 16,
-                  alignItems: "start",
-                }}
-              >
-                <div>
-                  {brand === "SHANTHA" ? (
-                    <>
-                      <div>
-                        <div className="addr-line">• Kadabagere,Beside State Bank India,Magadi Main Road, Bangalore - 562130</div>
-                        <div className="addr-line">• No.195, Oppsit.to Muddanna Ceramics, Ullal Main Road, Bangalore - 560091</div>
-                        <div className="addr-line">• Oppsit. Lens Cart, D - Group Layout, Gidadakonenahalli, Bangalore - 560091</div>
-                        <div className="addr-line">• No.1, Opp to Udupi Garden Hotel,Andrahalli Main Road, Bangalore - 560091</div>
-                        <div className="addr-line">• Tavarekere, Besides Poorvika Elect., Magadi Main Road, Bangalore - 562130</div>
-                        <div className="addr-line">• Hegganahalli,Anjaneya Temple,Hegganahali Main Road, Bangalore - 560091</div>
-                        <div className="addr-line">• No.34/1,Opp.Sarita Bar,Channenahali,Magdi Main Road, Bangalore - 562130</div>
-                        <div className="addr-line">• No.14,Nelagadrahalli Main Road,Nr St Joseph's College, Bangalore - 560073</div>
-                      </div>
-                      <div style={{ marginTop: 6, fontWeight: 600 }}>
-                        Mob: 9731366921 / 8073283502 / 9035131806
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="addr-linehonda">
-                        Site No. 116/1, Bydarahalli, Magadi Main Road, Opp. HP Petrol Bunk, Bangalore - 560091
-                      </div>
-                      <div style={{ marginTop: 6, fontWeight: 600 }}>
-                        Mob: 9731366921 / 8073283502 / 9741609799
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                <div
-                  className="brand-right"
-                  style={{
-                    display: "flex",
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 16,
-                    justifyContent: "flex-end",
-                  }}
-                >
-                  <img
-                    src={brand === "SHANTHA" ? "/shantha-logoprint.png" : "/honda-logo.png"}
-                    alt="Brand Logo"
-                    style={{
-                      height: brand === "SHANTHA" ? 160 : 120,
-                      objectFit: "contain",
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Customer */}
-            <div className="box" style={{ marginBottom: 8 }}>
-              <div className="section-title">Customer Details</div>
-              <div className="row2">
-                <div><b>Name:</b> {form.getFieldValue("name") || "-"}</div>
-                <div><b>Mobile:</b> {form.getFieldValue("mobile") || "-"}</div>
-                <div style={{ gridColumn: "1 / span 2" }}><b>Address:</b> {form.getFieldValue("address") || "-"}</div>
-              </div>
-            </div>
-
-            {/* Vehicle */}
-            <div className="box" style={{ marginBottom: 8 }}>
-              <div className="section-title">Vehicle Details</div>
-              <div className="row3" style={{ fontSize: "12pt" }}>
-                <div><b>Company:</b> {company || form.getFieldValue("company") || "-"}</div>
-                <div><b>Model:</b> {model || form.getFieldValue("bikeModel") || "-"}</div>
-                <div><b>Variant:</b> {variant || form.getFieldValue("variant") || "-"}</div>
-              </div>
-              <div style={{ marginTop: 6, textAlign: "center" }}>
-                <span className="big-price">
-                  <span><b>On-Road Price:</b> </span>
-                  {inr0(form.getFieldValue("onRoadPrice") ?? onRoadPrice ?? 0)}
-                </span>
-              </div>
-            </div>
-
-            {/* EMI */}
-            {mode === "loan" && (
-              <div className="box" style={{ marginBottom: 8 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 12, alignItems: "start" }}>
-                  <div>
-                    <div style={{ fontWeight: 700, marginBottom: 4, fontSize: "12pt" }}>Down Payment</div>
-                    <div style={{ fontWeight: 800, fontSize: "18pt" }}>{inr0(downPayment || 0)}</div>
-                  </div>
-
-                  <div>
-                    <div style={{ fontWeight: 900, textAlign: "center", marginBottom: 4, fontSize: "14pt" }}>EMI DETAILS</div>
-                    <div style={{ display: "flex", gap: 8, justifyContent: "space-between", flexWrap: "wrap" }}>
-                      {tenures.map((mo) => (
-                        <div key={mo} className="emibox" style={{ flex: 1, minWidth: 120 }}>
-                          <div style={{ fontWeight: 700 }}>{mo} months</div>
-                          <div style={{ fontWeight: 900 }}>{inr0(monthlyFor(mo))}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Executive + fittings + docs */}
-            <div className="box" style={{ marginBottom: 8 }}>
-              <div style={{ marginBottom: 6, fontSize: "13pt", fontWeight: 700 }}>
-                <b>Executive name:</b> {executiveName || "-"}
-                {(() => {
-                  const found = EXECUTIVES.find((e) => e.name === executiveName);
-                  return found ? ` (${found.phone})` : "";
-                })()}
-              </div>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "0.6fr 1fr 1fr",
-                  gap: 16,
-                  alignItems: "start",
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: 700, marginBottom: 4 }}>Free Extra Fittings</div>
-                  <PrintList items={fittings} />
-                </div>
-
-                <div
-                  style={{
-                    minHeight: 120,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: 600,
-                  }}
-                >
-                  <img
-                    src={"/shantha-access.png"}
-                    alt="Accessories"
-                    style={{ height: 140, margin: "6px 0" }}
-                  />
-                </div>
-
-                <div>
-                  <div style={{ fontWeight: 700, marginBottom: 4 }}>Documents Required</div>
-                  <PrintList items={docsReq} />
-                </div>
-              </div>
-            </div>
-
-            <div style={{ fontSize: "9.5pt", display: "flex", justifyContent: "space-between" }}>
-              <div />
-              <div><b>Note:</b> Prices are indicative and subject to change without prior notice.</div>
-            </div>
-          </div>
         </div>
       </div>
     </>
