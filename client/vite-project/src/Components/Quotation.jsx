@@ -222,31 +222,6 @@ async function getNextSerial() {
 }
 
 /* ======================
-   PRINT FIT HELPER (NEW)
-   ====================== */
-// Scale the printable page so it always fits exactly in A4
-const fitToA4 = (doc, pageEl) => {
-  try {
-    if (!pageEl) return;
-    const pxPerMm = 96 / 25.4;        // Chromium CSS px per mm (approx)
-    const maxH = 297 * pxPerMm;       // A4 height in px
-    const h = pageEl.scrollHeight;
-    if (h > maxH) {
-      const scale = maxH / h;
-      pageEl.style.transform = `scale(${scale})`;
-      pageEl.style.transformOrigin = "top left";
-      // widen so visual width stays 210mm after scale
-      pageEl.style.width = `calc(210mm / ${scale})`;
-      pageEl.style.height = "297mm";
-    } else {
-      pageEl.style.transform = "none";
-      pageEl.style.width = "210mm";
-      pageEl.style.height = "297mm";
-    }
-  } catch { /* noop */ }
-};
-
-/* ======================
    COMPONENT
    ====================== */
 export default function Quotation() {
@@ -281,12 +256,13 @@ export default function Quotation() {
 
   const pageRef = useRef(null);
   const printDate = useMemo(() => {
-    const d = new Date();
-    const dd = String(d.getDate()).padStart(2, "0");
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const yyyy = d.getFullYear();
-    return `${dd}/${mm}/${yyyy}`;
-  }, []);
+  const d = new Date();
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}, []);
+
 
   // helper to make image paths absolute for the print iframe + cache-bust
   const absBust = (p) => {
@@ -414,21 +390,19 @@ export default function Quotation() {
         print-color-adjust: exact !important;
       }
       * { box-sizing: border-box; }
-      body, .print-wrap, .sheet, .box, .hdr-line { background: #fff !important; }
-      * { box-shadow: none !important; filter: none !important; }
       .print-wrap { margin: 0 auto; }
       .page {
         width: 210mm;
-        height: 297mm;               /* fixed height to lock A4 */
+        min-height: 297mm;
         padding: 12mm;
         background: #fff !important;
         box-sizing: border-box;
-        overflow: hidden !important; /* prevent bleed -> extra pages */
       }
       .sheet {
         width: 100%;
         font: 12pt/1.32 "Helvetica Neue", Arial, sans-serif;
         color: #111;
+        overflow: visible !important;
         page-break-inside: avoid;
         background: #fff !important;
       }
@@ -485,10 +459,6 @@ export default function Quotation() {
     const mount = doc.querySelector(".print-wrap");
     mount.appendChild(cloned);
 
-    const pageEl = cloned.matches(".page") ? cloned : cloned.querySelector(".page");
-    // Initial fit (before images/fonts)
-    fitToA4(doc, pageEl);
-
     const waitForAssets = async () => {
       const imgs = Array.from(doc.images || []);
       await Promise.all(
@@ -499,18 +469,16 @@ export default function Quotation() {
         )
       );
       if (doc.fonts && doc.fonts.ready) { try { await doc.fonts.ready; } catch {
-        //catch
+        // ignore font load failures
       } }
       // Give Android compositor a little settle time
-      await new Promise(res => setTimeout(res, 200));
+      await new Promise(res => setTimeout(res, 300));
     };
 
     try {
       await waitForAssets();
-      // Final fit (after assets)
-      fitToA4(doc, pageEl);
       try { win.focus(); } catch {
-        //ign
+        //ignore
       }
       try { win.print(); } catch { window.print(); }
     } finally {
