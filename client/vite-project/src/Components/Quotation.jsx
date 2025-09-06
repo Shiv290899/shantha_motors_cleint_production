@@ -93,7 +93,7 @@ const RATE_LOW = 9;
 const RATE_HIGH = 11;
 
 const EXECUTIVES = [
-  { name: "Rukini", phone: "9901678562" },
+  { name: "Ruini", phone: "9901678562" },
   { name: "Meghana", phone: "7019974219" },
   { name: "Nikitha", phone: "9535190015" },
   { name: "Prakash", phone: "9740176476" },
@@ -222,6 +222,41 @@ async function getNextSerial() {
 }
 
 /* ======================
+   PRINT HELPERS (MOBILE-STABLE)
+   ====================== */
+
+// FIX: robust waiter so we don't remove the iframe while the PDF is still writing (prevents "damaged file" on Android)
+function waitForPrintComplete(iframeWin, timeoutMs = 45000) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = () => { if (done) return; done = true; cleanup(); resolve(); };
+    const cleanup = () => {
+      clearTimeout(timer);
+      try { iframeWin.removeEventListener?.("afterprint", finish); } catch {//ignore
+        }
+      try { window.removeEventListener("afterprint", finish); } catch {
+        //ig
+      }
+      try { document.removeEventListener("visibilitychange", onVis); } catch {
+        //igno
+      }
+    };
+    try { iframeWin.addEventListener?.("afterprint", finish); } catch {
+      //ign
+    }
+    try { window.addEventListener("afterprint", finish); } catch {
+      //ign
+
+    }
+    const onVis = () => {
+      if (document.visibilityState === "visible") finish();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    const timer = setTimeout(finish, timeoutMs);
+  });
+}
+
+/* ======================
    COMPONENT
    ====================== */
 export default function Quotation() {
@@ -256,13 +291,12 @@ export default function Quotation() {
 
   const pageRef = useRef(null);
   const printDate = useMemo(() => {
-  const d = new Date();
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
-}, []);
-
+    const d = new Date();
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }, []);
 
   // helper to make image paths absolute for the print iframe + cache-bust
   const absBust = (p) => {
@@ -377,81 +411,68 @@ export default function Quotation() {
       if (src) img.setAttribute("src", absBust(src));
     });
 
-   const PRINT_STYLES = `
-  /* 1) Page box: use inches (widely honored); keep a px fallback class as well */
-  @page {
-    size: 8.27in 11.69in; /* A4 portrait */
-    margin: 0;
-  }
+    // FIX: updated print CSS — inches + flex + px fallback class available
+    const PRINT_STYLES = `
+      @page { size: 8.27in 11.69in; margin: 0; } /* A4 portrait in inches */
 
-  html, body {
-    margin: 0 !important;
-    padding: 0 !important;
-    background: #fff !important;
-    -webkit-text-size-adjust: 100% !important;
-    text-size-adjust: 100% !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        -webkit-text-size-adjust: 100% !important;
+        text-size-adjust: 100% !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
 
-  * { box-sizing: border-box; }
+      * { box-sizing: border-box; }
+      .print-wrap { margin: 0 auto; }
 
-  /* 2) The page area: pin to physical inches; also give a px fallback class .page--px */
-  .page {
-    width: 8.27in;
-    min-height: 11.69in;
-    padding: 0.47in; /* ~12mm */
-    background: #fff !important;
-    overflow: visible !important;
-  }
-  /* If some printers ignore inches, you can toggle this class from JS instead: 794x1123px ≈ A4 @96dpi */
-  .page--px {
-    width: 794px;
-    min-height: 1123px;
-    padding: 45px;
-  }
+      .page {
+        width: 8.27in;
+        min-height: 11.69in;
+        padding: 0.47in; /* ~12mm */
+        background: #fff !important;
+        overflow: visible !important;
+      }
+      /* Optional fallback if a device ignores @page/inches — toggle from JS if needed */
+      .page--px {
+        width: 794px;           /* ≈ A4 @96dpi */
+        min-height: 1123px;
+        padding: 45px;
+      }
 
-  .sheet {
-    width: 100%;
-    font: 12pt/1.32 "Helvetica Neue", Arial, sans-serif;
-    color: #111;
-    background: #fff !important;
-    page-break-inside: avoid;
-  }
+      /* Use flex in print — safer than Grid on some Android printers */
+      .row2 { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+      .row2 > * { flex: 1 1 45%; min-width: 220px; }
 
-  /* Avoid CSS that some mobile printers mangle; Flex is safer than Grid on older stacks */
-  .row2 { display: flex; flex-wrap: wrap; gap: 8px 16px; }
-  .row2 > * { flex: 1 1 45%; min-width: 220px; }
+      .row3 { display: flex; flex-wrap: wrap; gap: 10px 16px; }
+      .row3 > * { flex: 1 1 30%; min-width: 160px; }
 
-  .row3 { display: flex; flex-wrap: wrap; gap: 10px 16px; }
-  .row3 > * { flex: 1 1 30%; min-width: 160px; }
+      .box { border: 2px solid #000; border-radius: 6px; padding: 8px 10px; background: #fff; }
+      .plist { margin: 0; padding-left: 18px; }
+      .plist li { margin: 0 0 2px; }
+      .title-knhonda { font-size: 30pt; font-weight: 900; letter-spacing: .2px; }
+      .title-kn { font-size: 38pt; font-weight: 900; letter-spacing: .2px; }
+      .title-en { font-size: 20pt; font-weight: 800; margin-top: 2px; }
+      .big-price { font-size: 16pt; font-weight: 900; }
+      .addr-line { font-size: 11pt; }
+      .addr-linehonda { font-size: 12pt; }
+      .hdr-line { display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px; }
+      .hdr-title { flex: 1; display: flex; justify-content: center; }
+      .quo-box { font-size: 17pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; display: inline-block; }
+      .hdr-right { text-align: right; font-weight: 600; }
+      .emibox { border: 2px solid #000; border-radius: 8px; padding: 6px 10px; text-align: center; }
+      .section-title { font-size: 14pt; font-weight: 900; margin-bottom: 4px; }
 
-  .box { border: 2px solid #000; border-radius: 6px; padding: 8px 10px; background: #fff; }
-  .plist { margin: 0; padding-left: 18px; }
-  .plist li { margin: 0 0 2px; }
-  .title-knhonda { font-size: 30pt; font-weight: 900; letter-spacing: .2px; }
-  .title-kn { font-size: 38pt; font-weight: 900; letter-spacing: .2px; }
-  .title-en { font-size: 20pt; font-weight: 800; margin-top: 2px; }
-  .big-price { font-size: 16pt; font-weight: 900; }
-  .addr-line { font-size: 11pt; }
-  .addr-linehonda { font-size: 12pt; }
-  .hdr-line { display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px; }
-  .hdr-title { flex: 1; display: flex; justify-content: center; }
-  .quo-box { font-size: 17pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; display: inline-block; }
-  .hdr-right { text-align: right; font-weight: 600; }
-  .emibox { border: 2px solid #000; border-radius: 8px; padding: 6px 10px; text-align: center; }
-  .section-title { font-size: 14pt; font-weight: 900; margin-bottom: 4px; }
+      img { max-width: 100%; height: auto; background: transparent; image-rendering: auto; }
 
-  img { max-width: 100%; height: auto; background: transparent; image-rendering: auto; }
+      @media (prefers-color-scheme: dark) {
+        html, body { background: #fff !important; color: #111 !important; }
+      }
 
-  /* Force light mode colors in print */
-  @media (prefers-color-scheme: dark) {
-    html, body { background: #fff !important; color: #111 !important; }
-  }
-
-  @media print { .no-print { display: none !important; } }
-`;
-
+      @media print { .no-print { display: none !important; } }
+    `;
 
     const iframe = document.createElement("iframe");
     iframe.style.position = "fixed";
@@ -472,9 +493,9 @@ export default function Quotation() {
       <html>
       <head>
         <meta charset="utf-8"/>
-        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-
         <title>Quotation</title>
+        <!-- FIX: proper viewport so mobile PDF respects physical sizing -->
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
         <style>${PRINT_STYLES}</style>
       </head>
       <body>
@@ -485,6 +506,10 @@ export default function Quotation() {
     doc.close();
 
     const mount = doc.querySelector(".print-wrap");
+
+    // Optional: if a specific handset keeps shrinking, force pixel fallback:
+    // cloned.classList.add("page--px");
+
     mount.appendChild(cloned);
 
     const waitForAssets = async () => {
@@ -496,10 +521,12 @@ export default function Quotation() {
             : new Promise(res => { img.onload = img.onerror = () => res(); })
         )
       );
-      if (doc.fonts && doc.fonts.ready) { try { await doc.fonts.ready; } catch {
-        // ignore font load failures
-      } }
-      // Give Android compositor a little settle time
+      if (doc.fonts && doc.fonts.ready) {
+        try { await doc.fonts.ready; } catch {
+          //ign
+        }
+      }
+      // FIX: give mobile compositor a bit more time
       await new Promise(res => setTimeout(res, 600));
     };
 
@@ -508,11 +535,13 @@ export default function Quotation() {
       try { win.focus(); } catch {
         //ignore
       }
-      try { win.print(); } catch { window.print(); }
+      // FIX: call iframe print only; don't double-call window.print()
+      win.print();
+
+      // FIX: wait until printing completes or times out before removing iframe
+      await waitForPrintComplete(win, 45000);
     } finally {
-      setTimeout(() => {
-        iframe.parentNode && iframe.parentNode.removeChild(iframe);
-      }, 1000);
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
     }
   };
 
@@ -989,7 +1018,7 @@ export default function Quotation() {
               <div className="row2">
                 <div><b>Name:</b> {form.getFieldValue("name") || "-"}</div>
                 <div><b>Mobile:</b> {form.getFieldValue("mobile") || "-"}</div>
-                <div style={{ gridColumn: "1 / span 2" }}><b>Address:</b> {form.getFieldValue("address") || "-"}</div>
+                <div style={{ flexBasis: "100%" }}><b>Address:</b> {form.getFieldValue("address") || "-"}</div>
               </div>
             </div>
 
@@ -1012,13 +1041,13 @@ export default function Quotation() {
             {/* EMI */}
             {mode === "loan" && (
               <div className="box" style={{ marginBottom: 8 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 12, alignItems: "start" }}>
-                  <div>
+                <div style={{ display: "flex", gap: 12, alignItems: "stretch", flexWrap: "wrap" }}>
+                  <div style={{ minWidth: 180 }}>
                     <div style={{ fontWeight: 700, marginBottom: 4, fontSize: "12pt" }}>Down Payment</div>
                     <div style={{ fontWeight: 800, fontSize: "18pt" }}>{inr0(downPayment || 0)}</div>
                   </div>
 
-                  <div>
+                  <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 900, textAlign: "center", marginBottom: 4, fontSize: "14pt" }}>EMI DETAILS</div>
                     <div style={{ display: "flex", gap: 8, justifyContent: "space-between", flexWrap: "wrap" }}>
                       {tenures.map((mo) => (
@@ -1045,13 +1074,13 @@ export default function Quotation() {
 
               <div
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "0.6fr 1fr 1fr",
+                  display: "flex",
                   gap: 16,
                   alignItems: "start",
+                  flexWrap: "wrap",
                 }}
               >
-                <div>
+                <div style={{ minWidth: 160, flex: "1 1 200px" }}>
                   <div style={{ fontWeight: 700, marginBottom: 4 }}>Free Extra Fittings</div>
                   <PrintList items={fittings} />
                 </div>
@@ -1063,6 +1092,7 @@ export default function Quotation() {
                     alignItems: "center",
                     justifyContent: "center",
                     fontWeight: 600,
+                    flex: "1 1 160px",
                   }}
                 >
                   <img
@@ -1072,7 +1102,7 @@ export default function Quotation() {
                   />
                 </div>
 
-                <div>
+                <div style={{ minWidth: 160, flex: "1 1 200px" }}>
                   <div style={{ fontWeight: 700, marginBottom: 4 }}>Documents Required</div>
                   <PrintList items={docsReq} />
                 </div>
