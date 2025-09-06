@@ -256,19 +256,21 @@ export default function Quotation() {
 
   const pageRef = useRef(null);
   const printDate = useMemo(() => {
-  const d = new Date();
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
-}, []);
+    const d = new Date();
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }, []);
 
-
-  // helper to make image paths absolute for the print iframe + cache-bust
+  // --- Updated cache-busting helper (faster on mobile) ---
+  const ASSET_VERSION = "1"; // bump only if remote assets change
   const absBust = (p) => {
-    const src = p?.startsWith("http") ? p : `${window.location.origin}${p || ""}`;
-    const v = Date.now();
-    return src.includes("?") ? `${src}&v=${v}` : `${src}?v=${v}`;
+    if (!p) return "";
+    const url = p.startsWith("http") ? p : new URL(p, window.location.origin).href;
+    const isLocal = url.startsWith(window.location.origin);
+    if (isLocal) return url; // keep cached for speed
+    return url.includes("?") ? `${url}&v=${ASSET_VERSION}` : `${url}?v=${ASSET_VERSION}`;
   };
 
   useEffect(() => {
@@ -351,7 +353,7 @@ export default function Quotation() {
     return months > 0 ? total / months : 0;
   };
 
-  // ---------- Android-proof A4 print ----------
+  // ---------- Android/iOS-proof A4 print ----------
   const handlePrint = async () => {
     try {
       await form.validateFields([
@@ -377,9 +379,11 @@ export default function Quotation() {
       if (src) img.setAttribute("src", absBust(src));
     });
 
+    // --- Stricter A4 page with safe inner padding & mobile typography caps ---
     const PRINT_STYLES = `
-      @page { size: A4 portrait; margin: 0; }
+      @page { size: A4 portrait; margin: 8mm; }
       @viewport { width: device-width; }
+
       html, body {
         margin: 0 !important;
         padding: 0 !important;
@@ -388,43 +392,64 @@ export default function Quotation() {
         text-size-adjust: 100% !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
-      }
-      * { box-sizing: border-box; }
-      .print-wrap { margin: 0 auto; }
-      .page {
         width: 210mm;
         min-height: 297mm;
-        padding: 12mm;
-        background: #fff !important;
-        box-sizing: border-box;
       }
+
+      * { box-sizing: border-box; }
+
+      .page {
+        width: 194mm;           /* 210 - (8+8)mm margins */
+        min-height: 281mm;      /* 297 - (8+8)mm margins */
+        padding: 10mm;
+        margin: 0 auto;
+        background: #fff !important;
+        page-break-after: always;
+        overflow: visible !important;
+      }
+
       .sheet {
         width: 100%;
-        font: 12pt/1.32 "Helvetica Neue", Arial, sans-serif;
+        font: 11.5pt/1.32 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         color: #111;
-        overflow: visible !important;
-        page-break-inside: avoid;
         background: #fff !important;
       }
-      .row2 { display: grid; grid-template-columns: 0.8fr 1.4fr; gap: 8px 16px; }
-      .row3 { display: grid; grid-template-columns: 0.5fr 0.8fr 1fr; gap: 10px 16px; }
+
+      .row2 { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 8px 14px; }
+      .row3 { display: grid; grid-template-columns: 0.6fr 0.8fr 1fr; gap: 8px 14px; }
       .box { border: 2px solid #000; border-radius: 6px; padding: 8px 10px; background: #fff; }
-      .plist { margin: 0; padding-left: 18px; }
+      .plist { margin: 0; padding-left: 16px; }
       .plist li { margin: 0 0 2px; }
-      .title-knhonda { font-size: 30pt; font-weight: 900; letter-spacing: .2px; }
-      .title-kn { font-size: 38pt; font-weight: 900; letter-spacing: .2px; }
-      .title-en { font-size: 20pt; font-weight: 800; margin-top: 2px; }
-      .big-price { font-size: 16pt; font-weight: 900; }
-      .addr-line { font-size: 11pt; }
-      .addr-linehonda { font-size: 12pt; }
+      .big-price { font-size: 15pt; font-weight: 900; }
+      .title-kn { font-size: 34pt; font-weight: 900; letter-spacing: .2px; }
+      .title-knhonda { font-size: 28pt; font-weight: 900; letter-spacing: .2px; }
+      .title-en { font-size: 18pt; font-weight: 800; margin-top: 2px; }
+      .addr-line, .addr-linehonda { font-size: 10.5pt; }
+
       .hdr-line { display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px; }
-      .hdr-title { flex: 1; display: flex; justify-content: center; }
-      .quo-box { font-size: 17pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; display: inline-block; }
-      .hdr-right { text-align: right; font-weight: 600; }
+      .hdr-title { flex: 1; display:flex; justify-content:center; }
+      .quo-box { font-size: 16pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; display:inline-block; }
+      .hdr-right { text-align: right; font-weight: 600; font-size: 10.5pt; }
       .emibox { border: 2px solid #000; border-radius: 8px; padding: 6px 10px; text-align: center; }
-      .section-title { font-size: 14pt; font-weight: 900; margin-bottom: 4px; }
-      img { max-width: 100%; height: auto; background: transparent; }
-      @media print { .no-print { display: none !important; } }
+      .section-title { font-size: 13pt; font-weight: 900; margin-bottom: 4px; }
+
+      img { max-width: 100%; height: auto; background: transparent; image-rendering: -webkit-optimize-contrast; }
+
+      @media print {
+        .brand-right img { max-height: 120mm; height: 60mm; }
+      }
+
+      @media print and (max-width: 800px) {
+        .title-kn { font-size: 28pt; }
+        .title-knhonda { font-size: 24pt; }
+        .title-en { font-size: 16pt; }
+        .big-price { font-size: 14pt; }
+        .addr-line, .addr-linehonda, .hdr-right { font-size: 10pt; }
+        .row3 { grid-template-columns: 0.7fr 0.9fr 1fr; }
+        .page { padding: 8mm; }
+      }
+
+      @media screen { .no-print { display: none; } }
     `;
 
     const iframe = document.createElement("iframe");
@@ -446,6 +471,7 @@ export default function Quotation() {
       <html>
       <head>
         <meta charset="utf-8"/>
+        <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
         <title>Quotation</title>
         <style>${PRINT_STYLES}</style>
       </head>
@@ -469,16 +495,16 @@ export default function Quotation() {
         )
       );
       if (doc.fonts && doc.fonts.ready) { try { await doc.fonts.ready; } catch {
-        // ignore font load failures
+        //ignore
       } }
-      // Give Android compositor a little settle time
-      await new Promise(res => setTimeout(res, 300));
+      // Give Android/iOS compositor a little more settle time
+      await new Promise(res => setTimeout(res, 500));
     };
 
     try {
       await waitForAssets();
       try { win.focus(); } catch {
-        //ignore
+        //i
       }
       try { win.print(); } catch { window.print(); }
     } finally {
