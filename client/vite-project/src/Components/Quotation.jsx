@@ -93,7 +93,7 @@ const RATE_LOW = 9;
 const RATE_HIGH = 11;
 
 const EXECUTIVES = [
-  { name: "Rukmini", phone: "9901678562" },
+  { name: "Rukini", phone: "9901678562" },
   { name: "Meghana", phone: "7019974219" },
   { name: "Nikitha", phone: "9535190015" },
   { name: "Prakash", phone: "9740176476" },
@@ -377,55 +377,81 @@ export default function Quotation() {
       if (src) img.setAttribute("src", absBust(src));
     });
 
-    const PRINT_STYLES = `
-      @page { size: A4 portrait; margin: 0; }
-      @viewport { width: device-width; }
-      html, body {
-        margin: 0 !important;
-        padding: 0 !important;
-        background: #fff !important;
-        -webkit-text-size-adjust: 100% !important;
-        text-size-adjust: 100% !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-      * { box-sizing: border-box; }
-      .print-wrap { margin: 0 auto; }
-      .page {
-        width: 210mm;
-        min-height: 297mm;
-        padding: 12mm;
-        background: #fff !important;
-        box-sizing: border-box;
-      }
-      .sheet {
-        width: 100%;
-        font: 12pt/1.32 "Helvetica Neue", Arial, sans-serif;
-        color: #111;
-        overflow: visible !important;
-        page-break-inside: avoid;
-        background: #fff !important;
-      }
-      .row2 { display: grid; grid-template-columns: 0.8fr 1.4fr; gap: 8px 16px; }
-      .row3 { display: grid; grid-template-columns: 0.5fr 0.8fr 1fr; gap: 10px 16px; }
-      .box { border: 2px solid #000; border-radius: 6px; padding: 8px 10px; background: #fff; }
-      .plist { margin: 0; padding-left: 18px; }
-      .plist li { margin: 0 0 2px; }
-      .title-knhonda { font-size: 30pt; font-weight: 900; letter-spacing: .2px; }
-      .title-kn { font-size: 38pt; font-weight: 900; letter-spacing: .2px; }
-      .title-en { font-size: 20pt; font-weight: 800; margin-top: 2px; }
-      .big-price { font-size: 16pt; font-weight: 900; }
-      .addr-line { font-size: 11pt; }
-      .addr-linehonda { font-size: 12pt; }
-      .hdr-line { display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px; }
-      .hdr-title { flex: 1; display: flex; justify-content: center; }
-      .quo-box { font-size: 17pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; display: inline-block; }
-      .hdr-right { text-align: right; font-weight: 600; }
-      .emibox { border: 2px solid #000; border-radius: 8px; padding: 6px 10px; text-align: center; }
-      .section-title { font-size: 14pt; font-weight: 900; margin-bottom: 4px; }
-      img { max-width: 100%; height: auto; background: transparent; }
-      @media print { .no-print { display: none !important; } }
-    `;
+   const PRINT_STYLES = `
+  /* 1) Page box: use inches (widely honored); keep a px fallback class as well */
+  @page {
+    size: 8.27in 11.69in; /* A4 portrait */
+    margin: 0;
+  }
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    -webkit-text-size-adjust: 100% !important;
+    text-size-adjust: 100% !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  * { box-sizing: border-box; }
+
+  /* 2) The page area: pin to physical inches; also give a px fallback class .page--px */
+  .page {
+    width: 8.27in;
+    min-height: 11.69in;
+    padding: 0.47in; /* ~12mm */
+    background: #fff !important;
+    overflow: visible !important;
+  }
+  /* If some printers ignore inches, you can toggle this class from JS instead: 794x1123px ≈ A4 @96dpi */
+  .page--px {
+    width: 794px;
+    min-height: 1123px;
+    padding: 45px;
+  }
+
+  .sheet {
+    width: 100%;
+    font: 12pt/1.32 "Helvetica Neue", Arial, sans-serif;
+    color: #111;
+    background: #fff !important;
+    page-break-inside: avoid;
+  }
+
+  /* Avoid CSS that some mobile printers mangle; Flex is safer than Grid on older stacks */
+  .row2 { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+  .row2 > * { flex: 1 1 45%; min-width: 220px; }
+
+  .row3 { display: flex; flex-wrap: wrap; gap: 10px 16px; }
+  .row3 > * { flex: 1 1 30%; min-width: 160px; }
+
+  .box { border: 2px solid #000; border-radius: 6px; padding: 8px 10px; background: #fff; }
+  .plist { margin: 0; padding-left: 18px; }
+  .plist li { margin: 0 0 2px; }
+  .title-knhonda { font-size: 30pt; font-weight: 900; letter-spacing: .2px; }
+  .title-kn { font-size: 38pt; font-weight: 900; letter-spacing: .2px; }
+  .title-en { font-size: 20pt; font-weight: 800; margin-top: 2px; }
+  .big-price { font-size: 16pt; font-weight: 900; }
+  .addr-line { font-size: 11pt; }
+  .addr-linehonda { font-size: 12pt; }
+  .hdr-line { display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px; }
+  .hdr-title { flex: 1; display: flex; justify-content: center; }
+  .quo-box { font-size: 17pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; display: inline-block; }
+  .hdr-right { text-align: right; font-weight: 600; }
+  .emibox { border: 2px solid #000; border-radius: 8px; padding: 6px 10px; text-align: center; }
+  .section-title { font-size: 14pt; font-weight: 900; margin-bottom: 4px; }
+
+  img { max-width: 100%; height: auto; background: transparent; image-rendering: auto; }
+
+  /* Force light mode colors in print */
+  @media (prefers-color-scheme: dark) {
+    html, body { background: #fff !important; color: #111 !important; }
+  }
+
+  @media print { .no-print { display: none !important; } }
+`;
+
 
     const iframe = document.createElement("iframe");
     iframe.style.position = "fixed";
@@ -446,6 +472,8 @@ export default function Quotation() {
       <html>
       <head>
         <meta charset="utf-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
         <title>Quotation</title>
         <style>${PRINT_STYLES}</style>
       </head>
@@ -472,7 +500,7 @@ export default function Quotation() {
         // ignore font load failures
       } }
       // Give Android compositor a little settle time
-      await new Promise(res => setTimeout(res, 300));
+      await new Promise(res => setTimeout(res, 600));
     };
 
     try {
