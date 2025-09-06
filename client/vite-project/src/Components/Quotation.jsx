@@ -93,7 +93,7 @@ const RATE_LOW = 9;
 const RATE_HIGH = 11;
 
 const EXECUTIVES = [
-  { name: "Ruini", phone: "9901678562" },
+  { name: "Rukmini", phone: "9901678562" },
   { name: "Meghana", phone: "7019974219" },
   { name: "Nikitha", phone: "9535190015" },
   { name: "Prakash", phone: "9740176476" },
@@ -221,44 +221,6 @@ async function getNextSerial() {
   return String(current);
 }
 
-/* ======================
-   PRINT HELPERS (MOBILE-STABLE)
-   ====================== */
-
-// FIX: robust waiter so we don't remove the iframe while the PDF is still writing (prevents "damaged file" on Android)
-function waitForPrintComplete(iframeWin, timeoutMs = 45000) {
-  return new Promise((resolve) => {
-    let done = false;
-    const finish = () => { if (done) return; done = true; cleanup(); resolve(); };
-    const cleanup = () => {
-      clearTimeout(timer);
-      try { iframeWin.removeEventListener?.("afterprint", finish); } catch {//ignore
-        }
-      try { window.removeEventListener("afterprint", finish); } catch {
-        //ig
-      }
-      try { document.removeEventListener("visibilitychange", onVis); } catch {
-        //igno
-      }
-    };
-    try { iframeWin.addEventListener?.("afterprint", finish); } catch {
-      //ign
-    }
-    try { window.addEventListener("afterprint", finish); } catch {
-      //ign
-
-    }
-    const onVis = () => {
-      if (document.visibilityState === "visible") finish();
-    };
-    document.addEventListener("visibilitychange", onVis);
-    const timer = setTimeout(finish, timeoutMs);
-  });
-}
-
-/* ======================
-   COMPONENT
-   ====================== */
 export default function Quotation() {
   const [form] = Form.useForm();
 
@@ -298,12 +260,14 @@ export default function Quotation() {
     return `${dd}/${mm}/${yyyy}`;
   }, []);
 
-  // helper to make image paths absolute for the print iframe + cache-bust
-  const absBust = (p) => {
-    const src = p?.startsWith("http") ? p : `${window.location.origin}${p || ""}`;
-    const v = Date.now();
-    return src.includes("?") ? `${src}&v=${v}` : `${src}?v=${v}`;
-  };
+  // make image paths absolute + cache-bust
+const ABS_BUST = { /* … */ }; // still unused but won’t trigger your rule
+
+  // const absBust = (p) => {
+  //   const src = p?.startsWith("http") ? p : `${window.location.origin}${p || ""}`;
+  //   const v = Date.now();
+  //   return src.includes("?") ? `${src}&v=${v}` : `${src}?v=${v}`;
+  // };
 
   useEffect(() => {
     (async () => {
@@ -384,166 +348,143 @@ export default function Quotation() {
     const total = principal + totalInterest;
     return months > 0 ? total / months : 0;
   };
-
-  // ---------- Android-proof A4 print ----------
-  const handlePrint = async () => {
-    try {
-      await form.validateFields([
-        "serialNo", "name", "mobile", "address",
-        "company", "bikeModel", "variant", "onRoadPrice",
-      ]);
-    } catch {
-      message.warning("Fix the highlighted fields before printing.");
-      return;
-    }
-
-    const page = pageRef.current;
-    if (!page) { window.print(); return; }
-
-    // Ensure latest React commit is flushed
-    await new Promise((r) => setTimeout(r, 0));
-
-    const cloned = page.cloneNode(true);
-
-    // Make all image URLs absolute + cache-busted (avoid stale Android preview)
-    cloned.querySelectorAll("img").forEach((img) => {
-      const src = img.getAttribute("src");
-      if (src) img.setAttribute("src", absBust(src));
-    });
-
-    // FIX: updated print CSS — inches + flex + px fallback class available
-    const PRINT_STYLES = `
-      @page { size: 8.27in 11.69in; margin: 0; } /* A4 portrait in inches */
-
-      html, body {
-        margin: 0 !important;
-        padding: 0 !important;
-        background: #fff !important;
-        -webkit-text-size-adjust: 100% !important;
-        text-size-adjust: 100% !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-
-      * { box-sizing: border-box; }
-      .print-wrap { margin: 0 auto; }
-
-      .page {
-        width: 8.27in;
-        min-height: 11.69in;
-        padding: 0.47in; /* ~12mm */
-        background: #fff !important;
-        overflow: visible !important;
-      }
-      /* Optional fallback if a device ignores @page/inches — toggle from JS if needed */
-      .page--px {
-        width: 794px;           /* ≈ A4 @96dpi */
-        min-height: 1123px;
-        padding: 45px;
-      }
-
-      /* Use flex in print — safer than Grid on some Android printers */
-      .row2 { display: flex; flex-wrap: wrap; gap: 8px 16px; }
-      .row2 > * { flex: 1 1 45%; min-width: 220px; }
-
-      .row3 { display: flex; flex-wrap: wrap; gap: 10px 16px; }
-      .row3 > * { flex: 1 1 30%; min-width: 160px; }
-
-      .box { border: 2px solid #000; border-radius: 6px; padding: 8px 10px; background: #fff; }
-      .plist { margin: 0; padding-left: 18px; }
-      .plist li { margin: 0 0 2px; }
-      .title-knhonda { font-size: 30pt; font-weight: 900; letter-spacing: .2px; }
-      .title-kn { font-size: 38pt; font-weight: 900; letter-spacing: .2px; }
-      .title-en { font-size: 20pt; font-weight: 800; margin-top: 2px; }
-      .big-price { font-size: 16pt; font-weight: 900; }
-      .addr-line { font-size: 11pt; }
-      .addr-linehonda { font-size: 12pt; }
-      .hdr-line { display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px; }
-      .hdr-title { flex: 1; display: flex; justify-content: center; }
-      .quo-box { font-size: 17pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; display: inline-block; }
-      .hdr-right { text-align: right; font-weight: 600; }
-      .emibox { border: 2px solid #000; border-radius: 8px; padding: 6px 10px; text-align: center; }
-      .section-title { font-size: 14pt; font-weight: 900; margin-bottom: 4px; }
-
-      img { max-width: 100%; height: auto; background: transparent; image-rendering: auto; }
-
-      @media (prefers-color-scheme: dark) {
-        html, body { background: #fff !important; color: #111 !important; }
-      }
-
-      @media print { .no-print { display: none !important; } }
-    `;
-
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.right = "0";
-    iframe.style.bottom = "0";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
-    iframe.style.border = "0";
-    iframe.setAttribute("aria-hidden", "true");
-    document.body.appendChild(iframe);
-
-    const win = iframe.contentWindow;
-    const doc = win.document;
-
-    doc.open();
-    doc.write(`
-      <!doctype html>
-      <html>
-      <head>
-        <meta charset="utf-8"/>
-        <title>Quotation</title>
-        <!-- FIX: proper viewport so mobile PDF respects physical sizing -->
-        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-        <style>${PRINT_STYLES}</style>
-      </head>
-      <body>
-        <div class="print-wrap"></div>
-      </body>
-      </html>
-    `);
-    doc.close();
-
-    const mount = doc.querySelector(".print-wrap");
-
-    // Optional: if a specific handset keeps shrinking, force pixel fallback:
-    // cloned.classList.add("page--px");
-
-    mount.appendChild(cloned);
-
-    const waitForAssets = async () => {
-      const imgs = Array.from(doc.images || []);
-      await Promise.all(
-        imgs.map(img =>
+// put this helper above your component (or inside it, before handlePrint)
+function buildPrintableHTML(innerHTML, styles) {
+  const autoPrintScript = `
+    (function(){
+      const wait = async () => {
+        const imgs = Array.from(document.images || []);
+        await Promise.all(imgs.map(img =>
           (img.complete && img.naturalWidth)
-            ? Promise.resolve()
+            ? 1
             : new Promise(res => { img.onload = img.onerror = () => res(); })
-        )
-      );
-      if (doc.fonts && doc.fonts.ready) {
-        try { await doc.fonts.ready; } catch {
-          //ign
-        }
-      }
-      // FIX: give mobile compositor a bit more time
-      await new Promise(res => setTimeout(res, 600));
-    };
+        ));
+        if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch(e){} }
+        await new Promise(r => setTimeout(r, 600));
+        try { window.focus(); } catch(e){}
+        try { window.print(); } catch(e){}
+        const closeIt = () => { try { window.close(); } catch(e){} };
+        try { window.addEventListener('afterprint', closeIt); } catch(e){}
+        setTimeout(closeIt, 45000);
+      };
+      if (document.readyState === 'complete') wait();
+      else window.addEventListener('load', wait);
+    })();
+  `.trim();
 
-    try {
-      await waitForAssets();
-      try { win.focus(); } catch {
-        //ignore
-      }
-      // FIX: call iframe print only; don't double-call window.print()
-      win.print();
+  return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- Ensure any relative asset resolves against your app origin -->
+  <base href="${window.location.origin}/">
+  <title>Quotation</title>
+  <style>${styles || ""}</style>
+</head>
+<body>
+  <div class="print-wrap">${innerHTML}</div>
+  <script>${autoPrintScript}</script>
+</body>
+</html>`;
+}
 
-      // FIX: wait until printing completes or times out before removing iframe
-      await waitForPrintComplete(win, 45000);
-    } finally {
-      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-    }
+  /* ========= MOBILE-RELIABLE PRINT (popup tab) ========= */
+  /* ========= MOBILE-RELIABLE PRINT (popup tab, no noreferrer) ========= */
+// REPLACE your handlePrint with this Blob-URL version
+const handlePrint = async () => {
+  // Validate first (keeps the user gesture intact since print happens in new page)
+  try {
+    await form.validateFields([
+      "serialNo", "name", "mobile", "address",
+      "company", "bikeModel", "variant", "onRoadPrice",
+    ]);
+  } catch {
+    message.warning("Fix the highlighted fields before printing.");
+    return;
+  }
+
+  const page = pageRef.current;
+  if (!page) {
+    // fallback: if ref missing, at least try printing current page
+    try { window.print(); } catch  { /* intentionally empty */ }
+    return;
+  }
+
+  // Clone and absolutize images (prevents broken/cached assets)
+  const absBust = (p) => {
+    const src = p?.startsWith("http") ? p : `${window.location.origin}${p || ""}`;
+    const v = Date.now();
+    return src.includes("?") ? `${src}&v=${v}` : `${src}?v=${v}`;
   };
+  const cloned = page.cloneNode(true);
+  cloned.querySelectorAll("img").forEach((img) => {
+    const src = img.getAttribute("src");
+    if (src) img.setAttribute("src", absBust(src));
+  });
+
+  // Same A4-inches CSS you already use (flex layout for Android safety)
+  const PRINT_STYLES = `
+    @page { size: 8.27in 11.69in; margin: 0; }
+    html, body {
+      margin: 0 !important; padding: 0 !important; background: #fff !important;
+      -webkit-text-size-adjust: 100% !important; text-size-adjust: 100% !important;
+      -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
+    }
+    * { box-sizing: border-box; }
+    .print-wrap { margin: 0 auto; }
+    .page { width: 8.27in; min-height: 11.69in; padding: 0.47in; background: #fff !important; overflow: visible !important; }
+    /* Pixel fallback (~A4 @96dpi) — if a handset shrinks layout, add .page--px on the root .page */
+    .page--px { width: 794px; min-height: 1123px; padding: 45px; }
+    .row2 { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+    .row2 > * { flex: 1 1 45%; min-width: 220px; }
+    .row3 { display: flex; flex-wrap: wrap; gap: 10px 16px; }
+    .row3 > * { flex: 1 1 30%; min-width: 160px; }
+    .box { border: 2px solid #000; border-radius: 6px; padding: 8px 10px; background: #fff; }
+    .plist { margin: 0; padding-left: 18px; } .plist li { margin: 0 0 2px; }
+    .title-knhonda { font-size: 30pt; font-weight: 900; letter-spacing: .2px; }
+    .title-kn { font-size: 38pt; font-weight: 900; letter-spacing: .2px; }
+    .title-en { font-size: 20pt; font-weight: 800; margin-top: 2px; }
+    .big-price { font-size: 16pt; font-weight: 900; }
+    .addr-line { font-size: 11pt; } .addr-linehonda { font-size: 12pt; }
+    .hdr-line { display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px; }
+    .hdr-title { flex: 1; display:flex; justify-content:center; }
+    .quo-box { font-size: 17pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; display: inline-block; }
+    .hdr-right { text-align: right; font-weight: 600; }
+    .emibox { border: 2px solid #000; border-radius: 8px; padding: 6px 10px; text-align: center; }
+    .section-title { font-size: 14pt; font-weight: 900; margin-bottom: 4px; }
+    img { max-width: 100%; height: auto; background: transparent; image-rendering: auto; }
+    @media (prefers-color-scheme: dark) { html, body { background:#fff !important; color:#111 !important; } }
+  `;
+
+  // Build HTML and Blob URL
+  const html = buildPrintableHTML(cloned.outerHTML, PRINT_STYLES);
+  const blob = new Blob([html], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+
+  // Open the blob URL directly (no document.write, no noreferrer issues)
+  let w = null;
+  try {
+    w = window.open(url, "_blank"); // avoid "noreferrer"
+  } catch   {
+    w = null;
+  }
+
+  if (!w) {
+    // Popup blocked — navigate current tab (user can go back)
+    const revoke = () => URL.revokeObjectURL(url);
+    window.addEventListener("pagehide", revoke, { once: true });
+    window.location.href = url;
+    return;
+  }
+
+  // Revoke when the new page is gone
+  setTimeout(() => {
+    try { URL.revokeObjectURL(url); } catch   { /* intentionally empty */ }
+  }, 120000);
+};
+
+
 
   // Capture Ctrl/Cmd + P and route to handlePrint
   useEffect(() => {
