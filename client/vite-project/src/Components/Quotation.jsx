@@ -221,6 +221,9 @@ async function getNextSerial() {
   return String(current);
 }
 
+/* ======================
+   COMPONENT
+   ====================== */
 export default function Quotation() {
   const [form] = Form.useForm();
 
@@ -253,21 +256,20 @@ export default function Quotation() {
 
   const pageRef = useRef(null);
   const printDate = useMemo(() => {
-    const d = new Date();
-    const dd = String(d.getDate()).padStart(2, "0");
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const yyyy = d.getFullYear();
-    return `${dd}/${mm}/${yyyy}`;
-  }, []);
+  const d = new Date();
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}, []);
 
-  // make image paths absolute + cache-bust
-const ABS_BUST = { /* … */ }; // still unused but won’t trigger your rule
 
-  // const absBust = (p) => {
-  //   const src = p?.startsWith("http") ? p : `${window.location.origin}${p || ""}`;
-  //   const v = Date.now();
-  //   return src.includes("?") ? `${src}&v=${v}` : `${src}?v=${v}`;
-  // };
+  // helper to make image paths absolute for the print iframe + cache-bust
+  const absBust = (p) => {
+    const src = p?.startsWith("http") ? p : `${window.location.origin}${p || ""}`;
+    const v = Date.now();
+    return src.includes("?") ? `${src}&v=${v}` : `${src}?v=${v}`;
+  };
 
   useEffect(() => {
     (async () => {
@@ -348,143 +350,143 @@ const ABS_BUST = { /* … */ }; // still unused but won’t trigger your rule
     const total = principal + totalInterest;
     return months > 0 ? total / months : 0;
   };
-// put this helper above your component (or inside it, before handlePrint)
-function buildPrintableHTML(innerHTML, styles) {
-  const autoPrintScript = `
-    (function(){
-      const wait = async () => {
-        const imgs = Array.from(document.images || []);
-        await Promise.all(imgs.map(img =>
-          (img.complete && img.naturalWidth)
-            ? 1
-            : new Promise(res => { img.onload = img.onerror = () => res(); })
-        ));
-        if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch(e){} }
-        await new Promise(r => setTimeout(r, 600));
-        try { window.focus(); } catch(e){}
-        try { window.print(); } catch(e){}
-        const closeIt = () => { try { window.close(); } catch(e){} };
-        try { window.addEventListener('afterprint', closeIt); } catch(e){}
-        setTimeout(closeIt, 45000);
-      };
-      if (document.readyState === 'complete') wait();
-      else window.addEventListener('load', wait);
-    })();
-  `.trim();
 
-  return `<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <!-- Ensure any relative asset resolves against your app origin -->
-  <base href="${window.location.origin}/">
-  <title>Quotation</title>
-  <style>${styles || ""}</style>
-</head>
-<body>
-  <div class="print-wrap">${innerHTML}</div>
-  <script>${autoPrintScript}</script>
-</body>
-</html>`;
-}
-
-  /* ========= MOBILE-RELIABLE PRINT (popup tab) ========= */
-  /* ========= MOBILE-RELIABLE PRINT (popup tab, no noreferrer) ========= */
-// REPLACE your handlePrint with this Blob-URL version
-const handlePrint = async () => {
-  // Validate first (keeps the user gesture intact since print happens in new page)
-  try {
-    await form.validateFields([
-      "serialNo", "name", "mobile", "address",
-      "company", "bikeModel", "variant", "onRoadPrice",
-    ]);
-  } catch {
-    message.warning("Fix the highlighted fields before printing.");
-    return;
-  }
-
-  const page = pageRef.current;
-  if (!page) {
-    // fallback: if ref missing, at least try printing current page
-    try { window.print(); } catch  { /* intentionally empty */ }
-    return;
-  }
-
-  // Clone and absolutize images (prevents broken/cached assets)
-  const absBust = (p) => {
-    const src = p?.startsWith("http") ? p : `${window.location.origin}${p || ""}`;
-    const v = Date.now();
-    return src.includes("?") ? `${src}&v=${v}` : `${src}?v=${v}`;
-  };
-  const cloned = page.cloneNode(true);
-  cloned.querySelectorAll("img").forEach((img) => {
-    const src = img.getAttribute("src");
-    if (src) img.setAttribute("src", absBust(src));
-  });
-
-  // Same A4-inches CSS you already use (flex layout for Android safety)
-  const PRINT_STYLES = `
-    @page { size: 8.27in 11.69in; margin: 0; }
-    html, body {
-      margin: 0 !important; padding: 0 !important; background: #fff !important;
-      -webkit-text-size-adjust: 100% !important; text-size-adjust: 100% !important;
-      -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
+  // ---------- Android-proof A4 print ----------
+  const handlePrint = async () => {
+    try {
+      await form.validateFields([
+        "serialNo", "name", "mobile", "address",
+        "company", "bikeModel", "variant", "onRoadPrice",
+      ]);
+    } catch {
+      message.warning("Fix the highlighted fields before printing.");
+      return;
     }
-    * { box-sizing: border-box; }
-    .print-wrap { margin: 0 auto; }
-    .page { width: 8.27in; min-height: 11.69in; padding: 0.47in; background: #fff !important; overflow: visible !important; }
-    /* Pixel fallback (~A4 @96dpi) — if a handset shrinks layout, add .page--px on the root .page */
-    .page--px { width: 794px; min-height: 1123px; padding: 45px; }
-    .row2 { display: flex; flex-wrap: wrap; gap: 8px 16px; }
-    .row2 > * { flex: 1 1 45%; min-width: 220px; }
-    .row3 { display: flex; flex-wrap: wrap; gap: 10px 16px; }
-    .row3 > * { flex: 1 1 30%; min-width: 160px; }
-    .box { border: 2px solid #000; border-radius: 6px; padding: 8px 10px; background: #fff; }
-    .plist { margin: 0; padding-left: 18px; } .plist li { margin: 0 0 2px; }
-    .title-knhonda { font-size: 30pt; font-weight: 900; letter-spacing: .2px; }
-    .title-kn { font-size: 38pt; font-weight: 900; letter-spacing: .2px; }
-    .title-en { font-size: 20pt; font-weight: 800; margin-top: 2px; }
-    .big-price { font-size: 16pt; font-weight: 900; }
-    .addr-line { font-size: 11pt; } .addr-linehonda { font-size: 12pt; }
-    .hdr-line { display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px; }
-    .hdr-title { flex: 1; display:flex; justify-content:center; }
-    .quo-box { font-size: 17pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; display: inline-block; }
-    .hdr-right { text-align: right; font-weight: 600; }
-    .emibox { border: 2px solid #000; border-radius: 8px; padding: 6px 10px; text-align: center; }
-    .section-title { font-size: 14pt; font-weight: 900; margin-bottom: 4px; }
-    img { max-width: 100%; height: auto; background: transparent; image-rendering: auto; }
-    @media (prefers-color-scheme: dark) { html, body { background:#fff !important; color:#111 !important; } }
-  `;
 
-  // Build HTML and Blob URL
-  const html = buildPrintableHTML(cloned.outerHTML, PRINT_STYLES);
-  const blob = new Blob([html], { type: "text/html" });
-  const url = URL.createObjectURL(blob);
+    const page = pageRef.current;
+    if (!page) { window.print(); return; }
 
-  // Open the blob URL directly (no document.write, no noreferrer issues)
-  let w = null;
-  try {
-    w = window.open(url, "_blank"); // avoid "noreferrer"
-  } catch   {
-    w = null;
-  }
+    // Ensure latest React commit is flushed
+    await new Promise((r) => setTimeout(r, 0));
 
-  if (!w) {
-    // Popup blocked — navigate current tab (user can go back)
-    const revoke = () => URL.revokeObjectURL(url);
-    window.addEventListener("pagehide", revoke, { once: true });
-    window.location.href = url;
-    return;
-  }
+    const cloned = page.cloneNode(true);
 
-  // Revoke when the new page is gone
-  setTimeout(() => {
-    try { URL.revokeObjectURL(url); } catch   { /* intentionally empty */ }
-  }, 120000);
-};
+    // Make all image URLs absolute + cache-busted (avoid stale Android preview)
+    cloned.querySelectorAll("img").forEach((img) => {
+      const src = img.getAttribute("src");
+      if (src) img.setAttribute("src", absBust(src));
+    });
 
+    const PRINT_STYLES = `
+      @page { size: A4 portrait; margin: 0; }
+      @viewport { width: device-width; }
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        -webkit-text-size-adjust: 100% !important;
+        text-size-adjust: 100% !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      * { box-sizing: border-box; }
+      .print-wrap { margin: 0 auto; }
+      .page {
+        width: 210mm;
+        min-height: 297mm;
+        padding: 12mm;
+        background: #fff !important;
+        box-sizing: border-box;
+      }
+      .sheet {
+        width: 100%;
+        font: 12pt/1.32 "Helvetica Neue", Arial, sans-serif;
+        color: #111;
+        overflow: visible !important;
+        page-break-inside: avoid;
+        background: #fff !important;
+      }
+      .row2 { display: grid; grid-template-columns: 0.8fr 1.4fr; gap: 8px 16px; }
+      .row3 { display: grid; grid-template-columns: 0.5fr 0.8fr 1fr; gap: 10px 16px; }
+      .box { border: 2px solid #000; border-radius: 6px; padding: 8px 10px; background: #fff; }
+      .plist { margin: 0; padding-left: 18px; }
+      .plist li { margin: 0 0 2px; }
+      .title-knhonda { font-size: 30pt; font-weight: 900; letter-spacing: .2px; }
+      .title-kn { font-size: 38pt; font-weight: 900; letter-spacing: .2px; }
+      .title-en { font-size: 20pt; font-weight: 800; margin-top: 2px; }
+      .big-price { font-size: 16pt; font-weight: 900; }
+      .addr-line { font-size: 11pt; }
+      .addr-linehonda { font-size: 12pt; }
+      .hdr-line { display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px; }
+      .hdr-title { flex: 1; display: flex; justify-content: center; }
+      .quo-box { font-size: 17pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; display: inline-block; }
+      .hdr-right { text-align: right; font-weight: 600; }
+      .emibox { border: 2px solid #000; border-radius: 8px; padding: 6px 10px; text-align: center; }
+      .section-title { font-size: 14pt; font-weight: 900; margin-bottom: 4px; }
+      img { max-width: 100%; height: auto; background: transparent; }
+      @media print { .no-print { display: none !important; } }
+    `;
 
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.setAttribute("aria-hidden", "true");
+    document.body.appendChild(iframe);
+
+    const win = iframe.contentWindow;
+    const doc = win.document;
+
+    doc.open();
+    doc.write(`
+      <!doctype html>
+      <html>
+      <head>
+        <meta charset="utf-8"/>
+        <title>Quotation</title>
+        <style>${PRINT_STYLES}</style>
+      </head>
+      <body>
+        <div class="print-wrap"></div>
+      </body>
+      </html>
+    `);
+    doc.close();
+
+    const mount = doc.querySelector(".print-wrap");
+    mount.appendChild(cloned);
+
+    const waitForAssets = async () => {
+      const imgs = Array.from(doc.images || []);
+      await Promise.all(
+        imgs.map(img =>
+          (img.complete && img.naturalWidth)
+            ? Promise.resolve()
+            : new Promise(res => { img.onload = img.onerror = () => res(); })
+        )
+      );
+      if (doc.fonts && doc.fonts.ready) { try { await doc.fonts.ready; } catch {
+        // ignore font load failures
+      } }
+      // Give Android compositor a little settle time
+      await new Promise(res => setTimeout(res, 300));
+    };
+
+    try {
+      await waitForAssets();
+      try { win.focus(); } catch {
+        //ignore
+      }
+      try { win.print(); } catch { window.print(); }
+    } finally {
+      setTimeout(() => {
+        iframe.parentNode && iframe.parentNode.removeChild(iframe);
+      }, 1000);
+    }
+  };
 
   // Capture Ctrl/Cmd + P and route to handlePrint
   useEffect(() => {
@@ -959,7 +961,7 @@ const handlePrint = async () => {
               <div className="row2">
                 <div><b>Name:</b> {form.getFieldValue("name") || "-"}</div>
                 <div><b>Mobile:</b> {form.getFieldValue("mobile") || "-"}</div>
-                <div style={{ flexBasis: "100%" }}><b>Address:</b> {form.getFieldValue("address") || "-"}</div>
+                <div style={{ gridColumn: "1 / span 2" }}><b>Address:</b> {form.getFieldValue("address") || "-"}</div>
               </div>
             </div>
 
@@ -982,13 +984,13 @@ const handlePrint = async () => {
             {/* EMI */}
             {mode === "loan" && (
               <div className="box" style={{ marginBottom: 8 }}>
-                <div style={{ display: "flex", gap: 12, alignItems: "stretch", flexWrap: "wrap" }}>
-                  <div style={{ minWidth: 180 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 12, alignItems: "start" }}>
+                  <div>
                     <div style={{ fontWeight: 700, marginBottom: 4, fontSize: "12pt" }}>Down Payment</div>
                     <div style={{ fontWeight: 800, fontSize: "18pt" }}>{inr0(downPayment || 0)}</div>
                   </div>
 
-                  <div style={{ flex: 1 }}>
+                  <div>
                     <div style={{ fontWeight: 900, textAlign: "center", marginBottom: 4, fontSize: "14pt" }}>EMI DETAILS</div>
                     <div style={{ display: "flex", gap: 8, justifyContent: "space-between", flexWrap: "wrap" }}>
                       {tenures.map((mo) => (
@@ -1015,13 +1017,13 @@ const handlePrint = async () => {
 
               <div
                 style={{
-                  display: "flex",
+                  display: "grid",
+                  gridTemplateColumns: "0.6fr 1fr 1fr",
                   gap: 16,
                   alignItems: "start",
-                  flexWrap: "wrap",
                 }}
               >
-                <div style={{ minWidth: 160, flex: "1 1 200px" }}>
+                <div>
                   <div style={{ fontWeight: 700, marginBottom: 4 }}>Free Extra Fittings</div>
                   <PrintList items={fittings} />
                 </div>
@@ -1033,7 +1035,6 @@ const handlePrint = async () => {
                     alignItems: "center",
                     justifyContent: "center",
                     fontWeight: 600,
-                    flex: "1 1 160px",
                   }}
                 >
                   <img
@@ -1043,7 +1044,7 @@ const handlePrint = async () => {
                   />
                 </div>
 
-                <div style={{ minWidth: 160, flex: "1 1 200px" }}>
+                <div>
                   <div style={{ fontWeight: 700, marginBottom: 4 }}>Documents Required</div>
                   <PrintList items={docsReq} />
                 </div>
