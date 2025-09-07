@@ -18,7 +18,7 @@ function App() {
     <>
       <Navbar /> {/* ✅ shown on every page */}
       <Routes>
-        <Route path="/" element={<ProtectedRoute><Home/></ProtectedRoute>} />
+        <Route path="/" element={<Home/>} />
         <Route path="/home" element={<Home />} />
 
         <Route path="/login" element={<Login />} />
