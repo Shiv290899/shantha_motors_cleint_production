@@ -7,21 +7,27 @@ import EmiCalculator from "./Components/EmiCalculator";
 import Home from "./Components/Home";
 import Login from "./Components/Login";
 import Register from "./Components/Register";
-import Navbar from "./Components/Navbar";
+import Navbar from "./Components/Navbar"; // ✅ new
 import Quotation from "./Components/Quotation";
+import ProtectedRoute from "./compo/ProtectedRoute";
 import JobCard from "./Components/JobCard";
+import A4Form from "./Components/A4Form";
 
 function App() {
   return (
     <>
-      <Navbar />
+      <Navbar /> {/* ✅ shown on every page */}
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<ProtectedRoute><Home/></ProtectedRoute>} />
         <Route path="/home" element={<Home />} />
+
         <Route path="/login" element={<Login />} />
         <Route path="/quotation" element={<Quotation />} />
         <Route path="/register" element={<Register />} />
         <Route path="/jobcard" element={<JobCard />} />
+         <Route path="/a4form" element={<A4Form/>} />
+         
+
         <Route path="/bookingform" element={<BookingForm />} />
         <Route path="/about" element={<About />} />
         <Route path="/about-us" element={<About />} />
