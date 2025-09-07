@@ -10,7 +10,7 @@ import Register from "./Components/Register";
 import Navbar from "./Components/Navbar"; // ✅ new
 import Quotation from "./Components/Quotation";
 import JobCard from "./Components/JobCard";
-import A4Form from "./Components/A4Form";
+
 
 function App() {
   return (
@@ -24,7 +24,7 @@ function App() {
         <Route path="/quotation" element={<Quotation />} />
         <Route path="/register" element={<Register />} />
         <Route path="/jobcard" element={<JobCard />} />
-         <Route path="/a4form" element={<A4Form/>} />
+      
          
 
         <Route path="/bookingform" element={<BookingForm />} />
