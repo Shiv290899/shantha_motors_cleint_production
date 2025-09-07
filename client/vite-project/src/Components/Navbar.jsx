@@ -104,6 +104,8 @@ export default function Navbar() {
     { label: "EMICalculator", path: "/emicalculator" }, // matches your route
     { label: "Contact", path: "/contact" },
     { label: "Login", path: "/login" },
+       { label: "About Us", path: "/about-us" },
+     { label: "A4Form", path: "/a4form" },
     { label: "About Us", path: "/about-us" },
      { label: "A4Form", path: "/a4form" },
   ];
