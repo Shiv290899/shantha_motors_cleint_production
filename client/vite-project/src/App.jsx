@@ -9,7 +9,6 @@ import Login from "./Components/Login";
 import Register from "./Components/Register";
 import Navbar from "./Components/Navbar"; // ✅ new
 import Quotation from "./Components/Quotation";
-import ProtectedRoute from "./compo/ProtectedRoute";
 import JobCard from "./Components/JobCard";
 import A4Form from "./Components/A4Form";
 
