@@ -1,11 +1,10 @@
-
 // PrintQuotation.jsx
 import React, { useEffect, useMemo, useRef } from "react";
 import { Button } from "antd";
 import { PrinterOutlined } from "@ant-design/icons";
 
 /**
- * Props expected from Quotation.jsx:
+ * Props expected from the parent (e.g., Quotation.jsx):
  * - form: AntD form instance (to read live field values)
  * - brand, company, model, variant, onRoadPrice
  * - mode ("cash" | "loan"), downPayment, emiSet ("12" | "48")
@@ -31,12 +30,11 @@ export default function PrintQuotation(props) {
 
   const pageRef = useRef(null);
 
-  // inside PrintQuotation component, near other hooks
-const fittingsTitle = React.useMemo(
-  () => `Free Extra Fittings (${vehicleType === "motorcycle" ? "Motorcycle" : "Scooter"})`,
-  [vehicleType]
-);
-
+  const fittingsTitle = useMemo(
+    () =>
+      `Free Extra Fittings (${vehicleType === "motorcycle" ? "Motorcycle" : "Scooter"})`,
+    [vehicleType]
+  );
 
   // display helpers
   const inr0 = (n) =>
@@ -80,18 +78,11 @@ const fittingsTitle = React.useMemo(
     return `${dd}/${mm}/${yyyy}`;
   }, []);
 
-  // cache-busting for images
-  const absBust = (p) => {
-    if (!p) return "";
-    const src = p.startsWith("http") ? p : `${window.location.origin}${p}`;
-    const v = Date.now();
-    return src.includes("?") ? `${src}&v=${v}` : `${src}?v=${v}`;
-  };
-
+  // CSS injected into the printable document (Blob page)
   const PRINT_STYLES = useMemo(
     () => `
       @page { size: A4 portrait; margin: 0; }
-      @viewport { width: device-width; }
+
       html, body {
         margin: 0 !important;
         padding: 0 !important;
@@ -102,7 +93,10 @@ const fittingsTitle = React.useMemo(
         print-color-adjust: exact !important;
       }
       * { box-sizing: border-box; }
+
       .print-wrap { margin: 0 auto; }
+      .print-sheet { display: block; } /* visible in the print doc */
+
       .page {
         width: 210mm;
         min-height: 297mm;
@@ -110,6 +104,7 @@ const fittingsTitle = React.useMemo(
         background: #fff !important;
         box-sizing: border-box;
       }
+
       .sheet {
         width: 100%;
         font: 12pt/1.32 "Helvetica Neue", Arial, sans-serif;
@@ -118,110 +113,113 @@ const fittingsTitle = React.useMemo(
         page-break-inside: avoid;
         background: #fff !important;
       }
+
       .row2 { display: grid; grid-template-columns: 0.8fr 1.4fr; gap: 8px 16px; }
       .row3 { display: grid; grid-template-columns: 0.5fr 0.8fr 1fr; gap: 10px 16px; }
+
       .box { border: 2px solid #000; border-radius: 6px; padding: 8px 10px; background: #fff; }
       .plist { margin: 0; padding-left: 18px; }
       .plist li { margin: 0 0 2px; }
+
       .title-knhonda { font-size: 30pt; font-weight: 900; letter-spacing: .2px; }
       .title-kn { font-size: 38pt; font-weight: 900; letter-spacing: .2px; }
       .title-en { font-size: 20pt; font-weight: 800; margin-top: 2px; }
       .big-price { font-size: 16pt; font-weight: 900; }
       .addr-line { font-size: 11pt; }
       .addr-linehonda { font-size: 12pt; }
+
       .hdr-line { display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px; }
       .hdr-title { flex: 1; display: flex; justify-content: center; }
       .quo-box { font-size: 17pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; display: inline-block; }
       .hdr-right { text-align: right; font-weight: 600; }
+
       .emibox { border: 2px solid #000; border-radius: 8px; padding: 6px 10px; text-align: center; }
       .section-title { font-size: 14pt; font-weight: 900; margin-bottom: 4px; }
+
       img { max-width: 100%; height: auto; background: transparent; }
       .no-print { display: inline-block; }
       @media print { .no-print { display: none !important; } }
-      /* keep the print canvas hidden on screen */
-      .print-sheet { display: none; }
-      @media print { .print-sheet { display: block; } }
     `,
     []
   );
 
+  // Blob-URL print flow (works reliably on Android Chrome)
   const handlePrint = async () => {
     const page = pageRef.current;
-    if (!page) return window.print();
+    if (!page) {
+      try { window.print(); } catch  { /* intentionally empty */ }
+      return;
+    }
 
     // flush layout
     await new Promise((r) => setTimeout(r, 0));
 
     const cloned = page.cloneNode(true);
 
-    // absolute + cache-bust images
+    // absolutize + cache-bust images (avoid stale or broken resources)
+    const absBust = (p) => {
+      const src = p?.startsWith("http") ? p : `${window.location.origin}${p || ""}`;
+      const v = Date.now();
+      return src.includes("?") ? `${src}&v=${v}` : `${src}?v=${v}`;
+    };
     cloned.querySelectorAll("img").forEach((img) => {
       const src = img.getAttribute("src");
       if (src) img.setAttribute("src", absBust(src));
     });
 
-    // print iframe
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.right = "0";
-    iframe.style.bottom = "0";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
-    iframe.style.border = "0";
-    iframe.setAttribute("aria-hidden", "true");
-    document.body.appendChild(iframe);
+    // Build a self-contained printable HTML document
+    const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <base href="${window.location.origin}/">
+  <title>Quotation</title>
+  <style>${PRINT_STYLES}</style>
+</head>
+<body>
+  <div class="print-wrap">${cloned.outerHTML}</div>
+  <script>
+    (function(){
+      const wait = async () => {
+        const imgs = Array.from(document.images || []);
+        await Promise.all(imgs.map(img =>
+          (img.complete && img.naturalWidth) ? 1 : new Promise(r => { img.onload = img.onerror = () => r(); })
+        ));
+        if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch(e){} }
+        await new Promise(r => setTimeout(r, 600));
+        try { window.focus(); } catch(e){}
+        try { window.print(); } catch(e){}
+        const closeIt = () => { try { window.close(); } catch(e){} };
+        try { window.addEventListener('afterprint', closeIt); } catch(e){}
+        setTimeout(closeIt, 45000);
+      };
+      if (document.readyState === 'complete') wait();
+      else window.addEventListener('load', wait);
+    })();
+  </script>
+</body>
+</html>`;
 
-    const win = iframe.contentWindow;
-    const doc = win.document;
+    // Open as a Blob URL (no document.write / no noreferrer issues)
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
 
-    doc.open();
-    doc.write(`
-      <!doctype html>
-      <html>
-      <head>
-        <meta charset="utf-8"/>
-        <title>Quotation</title>
-        <style>${PRINT_STYLES}</style>
-      </head>
-      <body>
-        <div class="print-wrap"></div>
-      </body>
-      </html>
-    `);
-    doc.close();
+    let popup = null;
+    try { popup = window.open(url, "_blank"); } catch  { /* intentionally empty */ }
 
-    doc.querySelector(".print-wrap").appendChild(cloned);
-
-    // wait for assets
-    const waitForAssets = async () => {
-      const imgs = Array.from(doc.images || []);
-      await Promise.all(
-        imgs.map((img) =>
-          img.complete && img.naturalWidth
-            ? Promise.resolve()
-            : new Promise((res) => {
-                img.onload = img.onerror = () => res();
-              })
-        )
-      );
-      if (doc.fonts && doc.fonts.ready) {
-        try { await doc.fonts.ready; } catch {
-
-            //ignpre
-        }
-      }
-      await new Promise((res) => setTimeout(res, 300));
-    };
-
-    try {
-      await waitForAssets();
-      try { win.focus(); } catch {
-        //ignore
-      }
-      try { win.print(); } catch { window.print(); }
-    } finally {
-      setTimeout(() => iframe.parentNode && iframe.parentNode.removeChild(iframe), 1000);
+    if (!popup) {
+      // Popup blocked → same-tab fallback (user can go back)
+      const revoke = () => { try { URL.revokeObjectURL(url); } catch  { /* intentionally empty */ } };
+      window.addEventListener("pagehide", revoke, { once: true });
+      window.location.href = url;
+      return;
     }
+
+    // Revoke Blob URL later
+    setTimeout(() => {
+      try { URL.revokeObjectURL(url); } catch  { /* intentionally empty */ }
+    }, 120000);
   };
 
   // Ctrl/Cmd+P shortcut → custom print
@@ -368,12 +366,7 @@ const fittingsTitle = React.useMemo(
 
               <div style={{ display: "grid", gridTemplateColumns: "0.6fr 1fr 1fr", gap: 16, alignItems: "start" }}>
                 <div>
-                 {/* before */}
-<div style={{ fontWeight: 700, marginBottom: 4 }}>Free Extra Fittings</div>
-
-{/* after */}
-<div style={{ fontWeight: 700, marginBottom: 4 }}>{fittingsTitle}</div>
-
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>{fittingsTitle}</div>
                   <PrintList items={fittings} />
                 </div>
 
@@ -398,12 +391,7 @@ const fittingsTitle = React.useMemo(
       </div>
 
       {/* The actual button shown on screen */}
-      <Button
-        className="no-print"
-        type="primary"
-        icon={<PrinterOutlined />}
-        onClick={handlePrint}
-      >
+      <Button className="no-print" type="primary" icon={<PrinterOutlined />} onClick={handlePrint}>
         Print
       </Button>
     </>
