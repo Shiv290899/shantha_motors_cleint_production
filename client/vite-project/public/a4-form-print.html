@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1"
+  />
+  <title>A4 Single-Page Print — Centered</title>
+
+  <style>
+    /* ---------- Base + Layout (screen) ---------- */
+    :root {
+      --bg: #0f172a;            /* slate-900 */
+      --card: #ffffff;
+      --muted: #475569;         /* slate-600 */
+      --ink: #0b1220;           /* dark text on paper */
+      --accent: #1e293b;        /* slate-800 */
+      --accent2: #334155;       /* slate-700 */
+      --ring: rgba(2, 132, 199, 0.35);
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: var(--bg);
+      color: #e2e8f0;           /* slate-200 */
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI,
+                   Roboto, Noto Sans, Ubuntu, Cantarell, Helvetica Neue, Arial, "Apple Color Emoji",
+                   "Segoe UI Emoji";
+    }
+
+    .wrap {
+      min-height: 100%;
+      display: grid;
+      place-items: start center;
+      padding: 24px;
+      gap: 24px;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 760px;
+      background: var(--card);
+      color: #0f172a; /* slate-900 */
+      border-radius: 16px;
+      box-shadow:
+        0 10px 30px rgba(0,0,0,.35),
+        0 1px 0 rgba(255,255,255,.06) inset;
+      padding: 20px;
+    }
+
+    .card h1 {
+      margin: 6px 0 2px;
+      font-size: clamp(20px, 4vw, 28px);
+      font-weight: 800;
+      letter-spacing: -0.015em;
+      color: var(--accent);
+    }
+    .sub {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 640px) {
+      .grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      color: var(--accent2);
+      margin: 8px 0 6px;
+      font-weight: 600;
+      letter-spacing: .015em;
+    }
+
+    input[type="text"], input[type="tel"] {
+      width: 100%;
+      font-size: 16px;
+      line-height: 1.35;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid #cbd5e1;
+      outline: none;
+      transition: border .15s, box-shadow .15s;
+      background: white;
+      color: #0b1220;
+    }
+    input[type="text"]:focus, input[type="tel"]:focus {
+      border-color: #0284c7;
+      box-shadow: 0 0 0 4px var(--ring);
+    }
+
+    .row-1 { grid-column: 1 / -1; }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      background: linear-gradient(180deg, #0ea5e9, #0284c7);
+      color: white;
+      box-shadow:
+        0 8px 18px rgba(2,132,199,.35),
+        0 1px 0 rgba(255,255,255,.2) inset;
+      transition: transform .05s ease, filter .15s ease;
+    }
+    button:hover { filter: brightness(1.03); }
+    button:active { transform: translateY(1px); }
+
+    .preview-note {
+      font-size: 12px;
+      color: #cbd5e1;
+      text-align: center;
+      max-width: 760px;
+    }
+
+    /* ---------- Print Sheet (hidden on screen, shown for print) ---------- */
+    .print-sheet {
+      /* A4 physical size for perfect Chrome consistency */
+      width: 210mm;
+      height: 297mm;
+      background: white;
+      color: var(--ink);
+      position: fixed;
+      inset: 0;                 /* prepare central overlay when previewing */
+      margin: auto;
+      border: 0;
+      box-shadow: none;
+      display: none;            /* hidden on screen, revealed in print */
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      overflow: hidden;
+    }
+
+    .print-inner {
+      /* keep content nicely inside margins and truly centered */
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: calc(210mm - 40mm);   /* 20mm margins left/right */
+      max-width: calc(210mm - 40mm);
+      text-align: center;
+    }
+
+    .brand {
+      font-size: 22pt;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 8mm;
+    }
+    .title {
+      font-family: Georgia, "Times New Roman", Times, serif;
+      font-weight: 900;
+      font-size: 28pt;
+      letter-spacing: .02em;
+      margin: 0 0 6mm;
+    }
+    .meta {
+      font-size: 10pt;
+      letter-spacing: .03em;
+      color: #334155;
+      margin-bottom: 8mm;
+    }
+    .divider {
+      height: 2px;
+      width: 60mm;
+      margin: 0 auto 10mm;
+      background: linear-gradient(90deg, #0ea5e9, #0369a1);
+    }
+    .kv {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6mm 8mm;
+      text-align: left;
+      justify-items: stretch;
+      margin: 0 auto 10mm;
+      width: 130mm;
+      max-width: 100%;
+    }
+    .k { font-size: 11pt; color: #334155; text-transform: uppercase; letter-spacing: .08em; }
+    .v { font-size: 16pt; font-weight: 800; color: #0b1220; }
+
+    .serial {
+      margin-top: 6mm;
+      font-size: 11pt;
+      color: #1e293b;
+    }
+    .badge {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 2px solid #0ea5e9;
+      font-weight: 800;
+      letter-spacing: .06em;
+    }
+
+    .footer {
+      position: absolute;
+      bottom: 14mm;
+      width: 100%;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 9pt;
+      color: #475569;
+      letter-spacing: .03em;
+    }
+
+    /* ---------- Print rules ---------- */
+    @page {
+      size: A4 portrait;   /* force A4 */
+      margin: 0;           /* we handle margins in the layout */
+    }
+
+    @media print {
+      /* Hide everything except the print sheet during printing */
+      body { background: white !important; }
+      .wrap, .card, .preview-note { display: none !important; }
+      .print-sheet { display: block !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Quick Card → A4 Print</h1>
+      <p class="sub">Fill the three fields below and press <b>Print A4</b>. The printed page is a single, centered A4 sheet with fixed styling across Chrome on desktop/laptop/tablet/mobile.</p>
+
+      <form id="infoForm" autocomplete="on" novalidate>
+        <div class="grid">
+          <div class="row-1">
+            <label for="name">Name</label>
+            <input id="name" type="text" inputmode="text" autocomplete="name"
+                   value="shiva7975854927" required />
+          </div>
+
+          <div>
+            <label for="phone">Phone (10 digits)</label>
+            <input id="phone" type="tel" inputmode="numeric" pattern="\\d{10}"
+                   value="7975854927" maxlength="10" required
+                   oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)" />
+          </div>
+
+          <div>
+            <label for="gmailName">Gmail Name (username only)</label>
+            <input id="gmailName" type="text" inputmode="email"
+                   value="shiva7975854927" required
+                   oninput="this.value=this.value.replace(/[^a-z0-9.+_-]/gi,'')" />
+          </div>
+        </div>
+
+        <div class="actions">
+          <button type="button" id="printBtn">🖨️ Print A4</button>
+          <button type="button" id="resetBtn" style="background: #e2e8f0; color:#0f172a; box-shadow:none;">Reset</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="preview-note">
+      Tip: For best consistency in Chrome’s dialog, keep <b>Scale = 100%</b>, <b>Margins = Default</b>, and turn off “Headers and footers.” The layout uses physical <b>mm</b> to lock to A4.
+    </div>
+  </div>
+
+  <!-- PRINT-ONLY CANVAS -->
+  <section class="print-sheet" aria-hidden="true">
+    <div class="print-inner" id="printInner">
+      <div class="brand">Shantha Motors</div>
+      <h2 class="title">Customer Information Card</h2>
+      <div class="meta" id="metaLine">Prepared on —</div>
+      <div class="divider"></div>
+
+      <div class="kv">
+        <div>
+          <div class="k">Full Name</div>
+          <div class="v" id="pName">—</div>
+        </div>
+        <div>
+          <div class="k">Phone Number</div>
+          <div class="v" id="pPhone">—</div>
+        </div>
+        <div>
+          <div class="k">Gmail</div>
+          <div class="v" id="pGmail">—</div>
+        </div>
+        <div>
+          <div class="k">Created At</div>
+          <div class="v" id="pCreated">—</div>
+        </div>
+      </div>
+
+      <div class="serial">
+        Serial No: <span class="badge" id="pSerial">—</span>
+      </div>
+
+      <div class="footer">
+        © <span id="yyyy"></span> Shantha Motors • One-page A4 print • Chrome Consistent
+      </div>
+    </div>
+  </section>
+
+  <script>
+    (function () {
+      const $ = (id) => document.getElementById(id);
+
+      const form = $('infoForm');
+      const printBtn = $('printBtn');
+      const resetBtn = $('resetBtn');
+
+      const nameEl = $('name');
+      const phoneEl = $('phone');
+      const gmailNameEl = $('gmailName');
+
+      const pName = $('pName');
+      const pPhone = $('pPhone');
+      const pGmail = $('pGmail');
+      const pCreated = $('pCreated');
+      const pSerial = $('pSerial');
+      const metaLine = $('metaLine');
+      $('yyyy').textContent = new Date().getFullYear();
+
+      // Stable, monotonic serial number using localStorage
+      function nextSerial() {
+        const key = 'a4_card_serial_counter_v1';
+        let n = parseInt(localStorage.getItem(key) || '0', 10);
+        n += 1;
+        localStorage.setItem(key, String(n));
+        // Format like SM-2025-000123
+        const y = new Date().getFullYear();
+        const pad = String(n).padStart(6, '0');
+        return `SM-${y}-${pad}`;
+      }
+
+      function formatWhen(dt) {
+        // Local time, fixed-ish format that’s readable everywhere
+        // Example: 07 Sep 2025, 09:12 AM IST
+        try {
+          const z = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata';
+          const date = new Intl.DateTimeFormat('en-GB', {
+            day: '2-digit', month: 'short', year: 'numeric',
+            timeZone: z
+          }).format(dt);
+          const time = new Intl.DateTimeFormat('en-GB', {
+            hour: '2-digit', minute: '2-digit', hour12: true,
+            timeZone: z
+          }).format(dt);
+          // Show the IANA zone name suffix for clarity where possible
+          return `${date}, ${time} (${z})`;
+        } catch (e) {
+          return dt.toLocaleString();
+        }
+      }
+
+      // Validate phone (must be exactly 10 digits)
+      function validPhone(v) {
+        return /^\d{10}$/.test(v);
+      }
+
+      // Build gmail from the "gmail name" (username only)
+      function toGmail(username) {
+        const u = (username || '').trim();
+        return u ? `${u}@gmail.com` : '';
+      }
+
+      function fillPrintView() {
+        const nm = nameEl.value.trim();
+        const ph = phoneEl.value.trim();
+        const gmU = gmailNameEl.value.trim();
+
+        if (!nm) { alert('Please enter a Name.'); return false; }
+        if (!validPhone(ph)) { alert('Phone must be exactly 10 digits.'); return false; }
+        if (!gmU) { alert('Please enter a Gmail name (username).'); return false; }
+
+        const serial = nextSerial();
+        const when = new Date();
+
+        pName.textContent = nm;
+        pPhone.textContent = ph;
+        pGmail.textContent = toGmail(gmU);
+        pCreated.textContent = formatWhen(when);
+        pSerial.textContent = serial;
+        metaLine.textContent = `Prepared on — ${formatWhen(when)}`;
+
+        return true;
+      }
+
+      // Main print flow
+      printBtn.addEventListener('click', () => {
+        if (!fillPrintView()) return;
+
+        // Ensure layout has computed before opening dialog
+        requestAnimationFrame(() => {
+          window.print();
+        });
+      });
+
+      resetBtn.addEventListener('click', () => {
+        form.reset();
+        // Restore your preferred defaults
+        nameEl.value = 'shiva7975854927';
+        phoneEl.value = '7975854927';
+        gmailNameEl.value = 'shiva7975854927';
+      });
+
+      // Mobile-friendly: enforce numeric-only on phone
+      phoneEl.addEventListener('beforeinput', (e) => {
+        if (e.data && /\D/.test(e.data)) e.preventDefault();
+      });
+
+      // Prefill (already set in HTML), but in case browser autofills differently:
+      if (!nameEl.value) nameEl.value = 'shiva7975854927';
+      if (!phoneEl.value) phoneEl.value = '7975854927';
+      if (!gmailNameEl.value) gmailNameEl.value = 'shiva7975854927';
+    })();
+  </script>
+</body>
+</html>
