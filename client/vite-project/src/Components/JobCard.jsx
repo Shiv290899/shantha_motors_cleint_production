@@ -21,8 +21,23 @@ const { Option } = Select;
 const SHEET_CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vRu1AT7UpETjJI7ZmiD3gSQS3h_UnnzjF8yHu650gRXWSI5LJvKj5QPdW2M7gVp-zhquJDZXj1wDIy3/pub?output=csv";
 
+// Google Form (prefill + autosubmit)
+const GFORM_BASE =
+  "https://docs.google.com/forms/d/e/1FAIpQLScGtIO_uWXq30BUSP3Pgs1EQFiXTBcLLiTP69rAHcv4QPm8hA/viewform?usp=pp_url";
+const GFORM_POST =
+  "https://docs.google.com/forms/d/e/1FAIpQLScGtIO_uWXq30BUSP3Pgs1EQFiXTBcLLiTP69rAHcv4QPm8hA/formResponse";
+
+const GFORM_ENTRY = {
+  name: "entry.1964588497",
+  mobile: "entry.108507469",
+  branch: "entry.2030797816",
+  mechanic: "entry.122292818",
+  amount: "entry.1599026863", // collected amount (Grand Total)
+};
+
 // Branches
 const BRANCHES = [
+  "Byadahalli",
   "Kadabagere",
   "Muddinapalya",
   "D-Group Layout",
@@ -36,6 +51,8 @@ const BRANCHES = [
 const EXECUTIVES = [
   { name: "Rukmini", phone: "9901678562" },
   { name: "Meghana", phone: "7019974219" },
+  { name: "Shubha", phone: "8971585057" },
+  { name: "Rani", phone: "8971585057" },
   { name: "Nikitha", phone: "9535190015" },
   { name: "Prakash", phone: "9740176476" },
   { name: "Kumar", phone: "7975807667" },
@@ -43,13 +60,12 @@ const EXECUTIVES = [
   { name: "Kavi", phone: "9108970455" },
   { name: "Narasimha", phone: "9900887666" },
   { name: "Kavya", phone: "8073165374" },
-  { name: "Shubha", phone: "8971585057" },
   { name: "Vanitha", phone: "9380729861" },
 ];
 
 const SERVICE_TYPES = ["Free", "Paid"]; // shown as checkboxes (single-select enforced)
 const VEHICLE_TYPES = ["Motorcycle","Scooter"]; // tabs
-const MECHANIC = ["Sonu", "ManMohan", "Mansur", "Irshad"];
+const MECHANIC = ["Sonu", "ManMohan", "Mansur", "Irshad", "Dakshat"];
 
 // Fuel Level (tabs)
 const FUEL_LEVELS = ["Empty", "¼", "½", "¾", "Full"];
@@ -145,6 +161,65 @@ const inr = (n) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 })
     .format(Math.max(0, Math.round(Number(n || 0))));
 
+// // Build prefill URL for Google Form using current form values
+// function buildPrefillUrl(vals, grandTotal) {
+//   const params = new URLSearchParams();
+
+//   if (vals?.custName)   params.set(GFORM_ENTRY.name, vals.custName);
+//   if (vals?.custMobile) params.set(GFORM_ENTRY.mobile, String(vals.custMobile));
+//   if (vals?.branch)     params.set(GFORM_ENTRY.branch, vals.branch);
+//   if (vals?.mechanic)   params.set(GFORM_ENTRY.mechanic, vals.mechanic);
+
+//   const amt = Number.isFinite(grandTotal) ? Math.round(grandTotal) : 0;
+//   params.set(GFORM_ENTRY.amount, String(amt));  // send Grand Total
+
+//   return `${GFORM_BASE}&${params.toString()}`;
+// }
+
+/** Silently POST to Google Form via hidden form + iframe (bypasses CORS) */
+function autoSubmitToGoogle(entries) {
+  const iframe = document.createElement("iframe");
+  iframe.name = "gform_iframe";
+  iframe.style.display = "none";
+
+  const form = document.createElement("form");
+  form.action = GFORM_POST;
+  form.method = "POST";
+  form.target = "gform_iframe";
+  form.style.display = "none";
+
+  Object.entries(entries).forEach(([name, value]) => {
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = name;
+    input.value = value ?? "";
+    form.appendChild(input);
+  });
+
+  // Optional Google params (usually not required, but harmless)
+  const pageHistory = document.createElement("input");
+  pageHistory.type = "hidden";
+  pageHistory.name = "pageHistory";
+  pageHistory.value = "0";
+  form.appendChild(pageHistory);
+
+  document.body.appendChild(iframe);
+  document.body.appendChild(form);
+  form.submit();
+
+  // Clean up after a moment
+  setTimeout(() => {
+    try { document.body.removeChild(form); } catch {
+      //
+    }
+    try { document.body.removeChild(iframe); } catch {
+
+    //ignore
+
+    }
+  }, 2000);
+}
+
 /* =========================
    MAIN COMPONENT
    ========================= */
@@ -207,16 +282,18 @@ export default function JobCard() {
   const discounts = Form.useWatch("discounts", form) || { labour: 0 };
 
   // Totals
-  const totals = useMemo(() => {
-    const labourSub = labourRows.reduce(
-      (sum, r) => sum + Number(r?.qty || 0) * Number(r?.rate || 0),
-      0
-    );
-    const labourGST = labourSub * (Number(gstLabour) / 100);
-    const labourDisc = Number(discounts.labour || 0);
-    const grand = Math.max(0, labourSub + labourGST - labourDisc);
-    return { labourSub, labourGST, labourDisc, grand };
-  }, [labourRows, gstLabour, discounts]);
+// ✅ fixed
+const totals = useMemo(() => {
+  const labourSub = labourRows.reduce(
+    (sum, r) => sum + Number(r?.qty || 0) * Number(r?.rate || 0),
+    0
+  );
+  const labourGST = labourSub * (Number(gstLabour) / 100);
+  const labourDisc = Number(discounts.labour || 0);
+  const grand = Math.max(0, labourSub + labourGST - labourDisc);
+  return { labourSub, labourGST, labourDisc, grand };
+}, [labourRows, gstLabour, discounts]);
+
 
   // KM input: only digits, max 6
   const handleKmKeyPress = (e) => { if (!/[0-9]/.test(e.key)) e.preventDefault(); };
@@ -233,28 +310,38 @@ export default function JobCard() {
   // Service Type UI: checkboxes but single-select enforced
   const serviceOptions = SERVICE_TYPES.map((t) => ({ label: t, value: t }));
 
-  // 👇 DEFAULT VEHICLE = "Motorcycle" when service is chosen, and populate rows immediately
-  const handleServiceCheckbox = (checkedValues) => {
-    const last = checkedValues[checkedValues.length - 1] || null;
+  // replace your existing handleServiceCheckbox with this:
+const handleServiceCheckbox = (checkedValues) => {
+  let next = null;
 
-    setServiceTypeLocal(last || null);
-    form.setFieldsValue({ serviceType: last || undefined });
+  if (checkedValues.length === 0) {
+    next = null;
+  } else if (checkedValues.length === 1) {
+    next = checkedValues[0];
+  } else {
+    // two selected temporarily; pick the one that wasn't previously selected
+    next = checkedValues.find(v => v !== serviceTypeLocal) || checkedValues[0];
+  }
 
-    if (last) {
-      const defaultVehicle = "Motorcycle";
-      setVehicleTypeLocal(defaultVehicle);
-      form.setFieldsValue({
-        vehicleType: defaultVehicle,
-        floorMat: undefined, // Scooter-only
-        labourRows: buildRows(last, defaultVehicle),
-        gstLabour: DEFAULT_GST_LABOUR,
-        discounts: { labour: 0 },
-      });
-      message.success(`Applied preset: ${last} / ${defaultVehicle}`);
-    } else {
-      form.setFieldsValue({ labourRows: [] });
-    }
-  };
+  setServiceTypeLocal(next || null);
+  form.setFieldsValue({ serviceType: next || undefined });
+
+  if (next) {
+    const defaultVehicle = "Motorcycle";
+    setVehicleTypeLocal(defaultVehicle);
+    form.setFieldsValue({
+      vehicleType: defaultVehicle,
+      floorMat: undefined,
+      labourRows: buildRows(next, defaultVehicle),
+      gstLabour: DEFAULT_GST_LABOUR,
+      discounts: { labour: 0 },
+    });
+    message.success(`Applied preset: ${next} / ${defaultVehicle}`);
+  } else {
+    form.setFieldsValue({ labourRows: [] });
+  }
+};
+
   const serviceValueForUI = serviceTypeLocal ? [serviceTypeLocal] : [];
 
   // If vehicle is not Scooter, clear Floor Mat
@@ -269,6 +356,55 @@ export default function JobCard() {
     setPrintMode(which);
     setTimeout(() => window.print(), 30);
     setTimeout(() => setPrintMode(null), 800);
+  };
+
+  // SAVE handling → open Google Form with prefilled values (user-visible)
+  // const handleSave = async () => {
+  //   try {
+  //     await form.validateFields([
+  //       "custName",
+  //       "custMobile",
+  //       "branch",
+  //       "mechanic",
+  //     ]);
+  //     const vals = form.getFieldsValue(true);
+  //     const url = buildPrefillUrl(vals, totals.grand);
+  //     window.open(url, "_blank", "noopener");
+  //     message.success("Opened Google Form with pre-filled data.");
+  //   } catch {
+  //     message.error("Please complete required fields before saving.");
+  //   }
+  // };
+
+  // AUTO-SAVE handling → silent submit to Google Form (sheet gets the row)
+  const handleAutoSave = async () => {
+    try {
+      await form.validateFields([
+        "custName",
+        "custMobile",
+        "branch",
+        "mechanic",
+      ]);
+      const vals = form.getFieldsValue(true);
+      const amt = Number.isFinite(totals.grand) ? Math.round(totals.grand) : 0;
+
+      // Map app values to Google entry fields
+      const entries = {
+        [GFORM_ENTRY.name]: vals.custName || "",
+        [GFORM_ENTRY.mobile]: String(vals.custMobile || ""),
+        [GFORM_ENTRY.branch]: vals.branch || "",
+        [GFORM_ENTRY.mechanic]: vals.mechanic || "",
+        [GFORM_ENTRY.amount]: String(amt),
+      };
+
+      autoSubmitToGoogle(entries);
+      message.loading({ content: "Auto-saving to Google Sheet…", key: "autosave" });
+      setTimeout(() => {
+        message.success({ content: "Saved to Google Sheet via Google Form.", key: "autosave", duration: 2 });
+      }, 1200);
+    } catch {
+      message.error("Please complete required fields before auto-saving.");
+    }
   };
 
   // Pull everything we need for printing
@@ -310,7 +446,7 @@ export default function JobCard() {
                 </Form.Item>
               </Col>
 
-              <Col xs={6} sm={4}>
+              <Col xs={24} sm={10}>
                 <Form.Item label="Branch" name="branch" rules={[{ required: true }]}>
                   <Select showSearch optionFilterProp="children" placeholder="Select branch">
                     {BRANCHES.map((b) => (
@@ -346,7 +482,7 @@ export default function JobCard() {
           {/* Vehicle & Customer */}
           <Card size="small" bordered style={{ marginTop: 12 }} title="Vehicle & Customer">
             <Row gutter={12}>
-              <Col xs={12} sm={4}>
+              <Col xs={24} sm={4}>
                 <Form.Item
                   label="Vehicle No."
                   name="regNo"
@@ -371,19 +507,19 @@ export default function JobCard() {
                 </Form.Item>
               </Col>
 
-              <Col xs={12} sm={4}>
+              <Col xs={24} sm={4}>
                 <Form.Item label="Model" name="model" rules={[{ required: true }]}>
                   <Input placeholder="e.g., Honda Activa 6G" />
                 </Form.Item>
               </Col>
 
-              <Col xs={12} sm={4}>
+              <Col xs={24} sm={4}>
                 <Form.Item label="Colour" name="colour">
                   <Input />
                 </Form.Item>
               </Col>
 
-              <Col xs={12} sm={4}>
+              <Col xs={24} sm={4}>
                 <Form.Item
                   label="Odometer Reading"
                   name="km"
@@ -488,7 +624,7 @@ export default function JobCard() {
                         }
                         if (serviceTypeLocal) {
                           form.setFieldsValue({
-                            labourRows: buildRows(serviceTypeLocal, val), // live switch
+                            labourRows: buildRows(serviceTypeLocal, val),
                             gstLabour: DEFAULT_GST_LABOUR,
                             discounts: { labour: 0 },
                           });
@@ -604,8 +740,18 @@ export default function JobCard() {
             </div>
           </Card>
 
-          {/* PRINT BUTTONS */}
+          {/* ACTION BUTTONS */}
           <Row justify="end" style={{ marginTop: 12 }} gutter={8}>
+            <Col>
+              <Button onClick={handleAutoSave}>
+                Save
+              </Button>
+            </Col>
+            {/* <Col>
+              <Button onClick={handleSave}>
+                Save (Open Google Form)
+              </Button>
+            </Col> */}
             <Col>
               <Button type="primary" onClick={() => handlePrint("pre")}>
                 Pre-service
