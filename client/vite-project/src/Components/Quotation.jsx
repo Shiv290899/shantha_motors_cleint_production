@@ -256,13 +256,12 @@ export default function Quotation() {
 
   const pageRef = useRef(null);
   const printDate = useMemo(() => {
-  const d = new Date();
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
-}, []);
-
+    const d = new Date();
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }, []);
 
   // helper to make image paths absolute for the print iframe + cache-bust
   const absBust = (p) => {
@@ -369,12 +368,27 @@ export default function Quotation() {
     // Ensure latest React commit is flushed
     await new Promise((r) => setTimeout(r, 0));
 
+    // Deep clone printable area
     const cloned = page.cloneNode(true);
+
+    // Replace canvases with images so they show up in print/PDF (Android/Chrome quirk)
+    cloned.querySelectorAll("canvas").forEach((cnv) => {
+      try {
+        const img = document.createElement("img");
+        img.setAttribute("alt", cnv.getAttribute("aria-label") || "canvas");
+        img.src = cnv.toDataURL("image/png");
+        img.style.maxWidth = "100%";
+        img.style.height = "auto";
+        cnv.parentNode && cnv.parentNode.replaceChild(img, cnv);
+      } catch {
+        /* ignore canvas export failures */
+      }
+    });
 
     // Make all image URLs absolute + cache-busted (avoid stale Android preview)
     cloned.querySelectorAll("img").forEach((img) => {
       const src = img.getAttribute("src");
-      if (src) img.setAttribute("src", absBust(src));
+      if (src && !src.startsWith("data:")) img.setAttribute("src", absBust(src));
     });
 
     const PRINT_STYLES = `
@@ -424,9 +438,19 @@ export default function Quotation() {
       .emibox { border: 2px solid #000; border-radius: 8px; padding: 6px 10px; text-align: center; }
       .section-title { font-size: 14pt; font-weight: 900; margin-bottom: 4px; }
       img { max-width: 100%; height: auto; background: transparent; }
-      @media print { .no-print { display: none !important; } }
+      /* Mobile/tablet Chrome safety: avoid transforms & sticky/fixed that can cause blank pages after printer change */
+      @media print {
+        * { transform: none !important; }
+        .fixed, .sticky, [style*="position: sticky"], [style*="position: fixed"] {
+          position: static !important; top: auto !important; bottom: auto !important;
+          left: auto !important; right: auto !important;
+        }
+        video, iframe { display: none !important; }
+        .no-print { display: none !important; }
+      }
     `;
 
+    // Create hidden iframe for clean print context
     const iframe = document.createElement("iframe");
     iframe.style.position = "fixed";
     iframe.style.right = "0";
@@ -440,12 +464,15 @@ export default function Quotation() {
     const win = iframe.contentWindow;
     const doc = win.document;
 
+    // Build minimal print document (include <base> for relative URLs and viewport)
     doc.open();
     doc.write(`
       <!doctype html>
       <html>
       <head>
         <meta charset="utf-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1"/>
+        <base href="${location.origin}${location.pathname}">
         <title>Quotation</title>
         <style>${PRINT_STYLES}</style>
       </head>
@@ -456,30 +483,41 @@ export default function Quotation() {
     `);
     doc.close();
 
+    // Copy parent stylesheets and inline <style> into the iframe to prevent font/layout loss on Android
+    try {
+      const head = doc.head;
+      Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).forEach((node) => {
+        // Avoid duplicating our PRINT_STYLES (already injected)
+        if (node.tagName.toLowerCase() === "style" && node.textContent?.includes("@page")) return;
+        head.appendChild(node.cloneNode(true));
+      });
+    } catch {
+      /* non-fatal */
+    }
+
+    // Mount cloned content
     const mount = doc.querySelector(".print-wrap");
     mount.appendChild(cloned);
 
+    // Wait for images & fonts to be ready; give compositor a bit of time (Android fix)
     const waitForAssets = async () => {
       const imgs = Array.from(doc.images || []);
       await Promise.all(
-        imgs.map(img =>
+        imgs.map((img) =>
           (img.complete && img.naturalWidth)
             ? Promise.resolve()
-            : new Promise(res => { img.onload = img.onerror = () => res(); })
+            : new Promise((res) => { img.onload = img.onerror = () => res(); })
         )
       );
-      if (doc.fonts && doc.fonts.ready) { try { await doc.fonts.ready; } catch {
-        // ignore font load failures
-      } }
-      // Give Android compositor a little settle time
-      await new Promise(res => setTimeout(res, 300));
+      if (doc.fonts && doc.fonts.ready) {
+        try { await doc.fonts.ready; } catch { /* ignore font load failures */ }
+      }
+      await new Promise((res) => setTimeout(res, 300));
     };
 
     try {
       await waitForAssets();
-      try { win.focus(); } catch {
-        //ignore
-      }
+      try { win.focus(); } catch { /* ignore */ }
       try { win.print(); } catch { window.print(); }
     } finally {
       setTimeout(() => {
