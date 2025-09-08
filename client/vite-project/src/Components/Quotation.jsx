@@ -531,7 +531,7 @@ export default function Quotation() {
       const showroomName = brand === "SHANTHA" ? "Shantha Motors" : "NH Motors";
       //const serial = form.getFieldValue("serialNo") || "-";
       const name = form.getFieldValue("name") || "-";
-      const mobile = form.getFieldValue("mobile") || "-";
+     // const mobile = form.getFieldValue("mobile") || "-";
       const comp = company || form.getFieldValue("company") || "-";
       const mdl = model || form.getFieldValue("bikeModel") || "-";
       const varnt = variant || form.getFieldValue("variant") || "-";
@@ -548,9 +548,7 @@ const header = [
 ];
 
 const bullets = [
-  `• *Date:* ${printDate}`,
-  `• *Customer:* ${name}`,
-  `• *Mobile:* ${mobile}`,
+  `• *Quotation Date:* ${printDate}`,
   `• *Vehicle:* ${comp} ${mdl} ${varnt}`,
   `• *On-Road Price:* ${inr0(priceNum)}`,
 ];
