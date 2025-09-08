@@ -371,73 +371,68 @@ export default function Quotation() {
 
     const cloned = page.cloneNode(true);
 
-    // Make all image URLs absolute + cache-busted (avoid stale Android preview)
-    cloned.querySelectorAll("img").forEach((img) => {
-      const src = img.getAttribute("src");
-      if (src) img.setAttribute("src", absBust(src));
-    });
+ // canvas -> img (Android print-safe)
+  cloned.querySelectorAll("canvas").forEach(cnv => {
+    try {
+      const img = document.createElement("img");
+      img.alt = cnv.getAttribute("aria-label") || "canvas";
+      img.src = cnv.toDataURL("image/png");
+      img.style.maxWidth = "100%";
+      img.style.height = "auto";
+      cnv.parentNode && cnv.parentNode.replaceChild(img, cnv);
+    } catch {
+      //ignore
+    }
+  });
 
-    const PRINT_STYLES = `
-      @page { size: A4 portrait; margin: 0; }
-      @viewport { width: device-width; }
-      html, body {
-        margin: 0 !important;
-        padding: 0 !important;
-        background: #fff !important;
-        -webkit-text-size-adjust: 100% !important;
-        text-size-adjust: 100% !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-      * { box-sizing: border-box; }
-      .print-wrap { margin: 0 auto; }
-      .page {
-        width: 210mm;
-        min-height: 297mm;
-        padding: 12mm;
-        background: #fff !important;
-        box-sizing: border-box;
-      }
-      .sheet {
-        width: 100%;
-        font: 12pt/1.32 "Helvetica Neue", Arial, sans-serif;
-        color: #111;
-        overflow: visible !important;
-        page-break-inside: avoid;
-        background: #fff !important;
-      }
-      .row2 { display: grid; grid-template-columns: 0.8fr 1.4fr; gap: 8px 16px; }
-      .row3 { display: grid; grid-template-columns: 0.5fr 0.8fr 1fr; gap: 10px 16px; }
-      .box { border: 2px solid #000; border-radius: 6px; padding: 8px 10px; background: #fff; }
-      .plist { margin: 0; padding-left: 18px; }
-      .plist li { margin: 0 0 2px; }
-      .title-knhonda { font-size: 30pt; font-weight: 900; letter-spacing: .2px; }
-      .title-kn { font-size: 38pt; font-weight: 900; letter-spacing: .2px; }
-      .title-en { font-size: 20pt; font-weight: 800; margin-top: 2px; }
-      .big-price { font-size: 16pt; font-weight: 900; }
-      .addr-line { font-size: 11pt; }
-      .addr-linehonda { font-size: 12pt; }
-      .hdr-line { display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px; }
-      .hdr-title { flex: 1; display: flex; justify-content: center; }
-      .quo-box { font-size: 17pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; display: inline-block; }
-      .hdr-right { text-align: right; font-weight: 600; }
-      .emibox { border: 2px solid #000; border-radius: 8px; padding: 6px 10px; text-align: center; }
-      .section-title { font-size: 14pt; font-weight: 900; margin-bottom: 4px; }
-      img { max-width: 100%; height: auto; background: transparent; }
-      @media print { .no-print { display: none !important; } }
-    `;
 
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.right = "0";
-    iframe.style.bottom = "0";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
-    iframe.style.border = "0";
-    iframe.setAttribute("aria-hidden", "true");
-    document.body.appendChild(iframe);
+  // absolute + cache-busted images
+  cloned.querySelectorAll("img").forEach(img => {
+    const src = img.getAttribute("src");
+    if (src && !src.startsWith("data:")) img.setAttribute("src", absBust(src));
+  });
 
-    const win = iframe.contentWindow;
+ const PRINT_STYLES = `
+    @page { size: A4 portrait; margin: 0; }
+    html, body {
+      margin: 0 !important; padding: 0 !important; background: #fff !important;
+      -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
+      font-family: Arial, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    .print-wrap { margin: 0 auto; }
+    .page { width: 210mm; min-height: 297mm; padding: 12mm; background: #fff !important; }
+    .sheet { width: 100%; font: 12pt/1.32 Arial, sans-serif; color: #111; page-break-inside: avoid; }
+    .row2 { display: grid; grid-template-columns: 0.8fr 1.4fr; gap: 8px 16px; }
+    .row3 { display: grid; grid-template-columns: 0.5fr 0.8fr 1fr; gap: 10px 16px; }
+    .box { border: 2px solid #000; border-radius: 6px; padding: 8px 10px; background: #fff; }
+    .plist { margin: 0; padding-left: 18px; } .plist li { margin: 0 0 2px; }
+    .title-knhonda { font-size: 30pt; font-weight: 900; letter-spacing: .2px; }
+    .title-kn { font-size: 38pt; font-weight: 900; letter-spacing: .2px; }
+    .title-en { font-size: 20pt; font-weight: 800; margin-top: 2px; }
+    .big-price { font-size: 16pt; font-weight: 900; }
+    .addr-line { font-size: 11pt; } .addr-linehonda { font-size: 12pt; }
+    .hdr-line { display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px; }
+    .hdr-title { flex: 1; display: flex; justify-content: center; }
+    .quo-box { font-size: 17pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; display: inline-block; }
+    .hdr-right { text-align: right; font-weight: 600; }
+    .emibox { border: 2px solid #000; border-radius: 8px; padding: 6px 10px; text-align: center; }
+    .section-title { font-size: 14pt; font-weight: 900; margin-bottom: 4px; }
+    img { max-width: 100%; height: auto; background: transparent; }
+    @media print {
+      * { transform: none !important; }
+      .fixed, .sticky, [style*="position: sticky"], [style*="position: fixed"] { position: static !important; }
+      .no-print { display: none !important; }
+    }
+  `;
+
+
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  if (isMobile) {
+    // ✅ Open a new tab immediately (keeps user gesture alive on mobile)
+    const win = window.open("", "_blank");
+    if (!win) { message.error("Please allow pop-ups to print."); return; }
     const doc = win.document;
 
     doc.open();
@@ -446,6 +441,8 @@ export default function Quotation() {
       <html>
       <head>
         <meta charset="utf-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1"/>
+        <base href="${location.origin}${location.pathname}">
         <title>Quotation</title>
         <style>${PRINT_STYLES}</style>
       </head>
@@ -456,8 +453,10 @@ export default function Quotation() {
     `);
     doc.close();
 
+// adopt/import the cloned node into the new document
     const mount = doc.querySelector(".print-wrap");
-    mount.appendChild(cloned);
+    const node = doc.importNode(cloned, true);
+    mount.appendChild(node);
 
     const waitForAssets = async () => {
       const imgs = Array.from(doc.images || []);
@@ -469,27 +468,99 @@ export default function Quotation() {
         )
       );
       if (doc.fonts && doc.fonts.ready) { try { await doc.fonts.ready; } catch {
-        // ignore font load failures
+        //igg
       } }
-      // Give Android compositor a little settle time
-      await new Promise(res => setTimeout(res, 300));
+      await new Promise(res => setTimeout(res, 200));
     };
 
-    try {
-      await waitForAssets();
-      try { win.focus(); } catch {
-        //rnfjj
-       }
-      try { win.print(); } catch { window.print(); }
-    } finally {
-      setTimeout(() => {
-        iframe.parentNode && iframe.parentNode.removeChild(iframe);
-      }, 1000);
+    await waitForAssets();
+    try { win.focus(); } catch {
+      //og
     }
+    win.print();
+    // Optionally close after print on mobile:
+    // setTimeout(() => { try { win.close(); } catch {} }, 500);
+    return;
+  }
+
+  // Desktop: iframe flow (works fine)
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  iframe.setAttribute("aria-hidden", "true");
+  document.body.appendChild(iframe);
+
+  const win = iframe.contentWindow;
+  const doc = win.document;
+
+  doc.open();
+  doc.write(`
+    <!doctype html>
+    <html>
+    <head>
+      <meta charset="utf-8"/>
+      <meta name="viewport" content="width=device-width, initial-scale=1"/>
+      <base href="${location.origin}${location.pathname}">
+      <title>Quotation</title>
+      <style>${PRINT_STYLES}</style>
+    </head>
+    <body>
+      <div class="print-wrap"></div>
+    </body>
+    </html>
+  `);
+  doc.close();
+
+  const mount = doc.querySelector(".print-wrap");
+  mount.appendChild(doc.importNode(cloned, true));
+
+  const waitForAssets = async () => {
+    const imgs = Array.from(doc.images || []);
+    await Promise.all(
+      imgs.map(img =>
+        (img.complete && img.naturalWidth)
+          ? Promise.resolve()
+          : new Promise(res => { img.onload = img.onerror = () => res(); })
+      )
+    );
+    if (doc.fonts && doc.fonts.ready) { try { await doc.fonts.ready; } catch {
+      //jijh
+    } }
+    await new Promise(res => setTimeout(res, 200));
   };
 
-  // Save → Google Form
-  const handleSaveToForm = async () => {
+  try {
+    await waitForAssets();
+    try { win.focus(); } catch {
+      //kgk
+    }
+    try { win.print(); } catch { window.print(); }
+  } finally {
+    setTimeout(() => { iframe.parentNode && iframe.parentNode.removeChild(iframe); }, 800);
+  }
+};
+
+
+  // Capture Ctrl/Cmd + P and route to handlePrint
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      const isPrintShortcut =
+        (e.ctrlKey || e.metaKey) && (e.key === "p" || e.key === "P");
+      if (isPrintShortcut) {
+        e.preventDefault();
+        handlePrint();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []); // handlePrint uses stable inner functions/values
+
+
+const handleSaveToForm = async () => {
     const v = await form.validateFields([
       "serialNo", "name", "mobile", "address",
       "company", "bikeModel", "variant", "onRoadPrice", "executive", "remarks",
@@ -516,8 +587,7 @@ export default function Quotation() {
       message.error("Could not save. Please check required fields and try again.");
     }
   };
-
-  // --------- NEW: WhatsApp deep-link (frontend only) ----------
+ // --------- NEW: WhatsApp deep-link (frontend only) ----------
   const toE164NoPlusIndia = (raw) => {
     const digits = String(raw || "").replace(/\D/g, "").replace(/^0+/, "");
     if (digits.length === 10) return `91${digits}`;
@@ -641,7 +711,7 @@ const handleWhatsAppClick = async () => {
         @media print { .print-sheet { display: block; } .no-print { display: none !important; } }
       `}</style>
 
-      {/* On-screen inputs */}
+  {/* On-screen inputs */}
       <div className="wrap no-print">
         <div className="card">
           <Form
@@ -1136,6 +1206,3 @@ const handleWhatsAppClick = async () => {
     </>
   );
 }
-
-
-//updated meghana
