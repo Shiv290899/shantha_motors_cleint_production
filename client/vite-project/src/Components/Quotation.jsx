@@ -514,75 +514,94 @@ export default function Quotation() {
     return "";
   };
 
-  const handleWhatsAppClick = async () => {
-    try {
-      // ensure core fields exist, esp. mobile
-      const v = await form.validateFields([
-        "serialNo", "name", "mobile",
-        "company", "bikeModel", "variant", "onRoadPrice"
-      ]);
+  // Updated WhatsApp share handler with a warmer, impressive welcome message
+const handleWhatsAppClick = async () => {
+  try {
+    // Validate essentials before composing the message
+    const v = await form.validateFields([
+      "serialNo", "name", "mobile",
+      "company", "bikeModel", "variant", "onRoadPrice"
+    ]); // ✅ ensure required fields exist
 
-      const phone = toE164NoPlusIndia(v.mobile);
-      if (!phone) {
-        message.error("Enter a valid 10-digit Indian mobile to open WhatsApp.");
-        return;
-      }
-
-      const showroomName = brand === "SHANTHA" ? "Shantha Motors" : "NH Motors";
-      //const serial = form.getFieldValue("serialNo") || "-";
-      const name = form.getFieldValue("name") || "-";
-     // const mobile = form.getFieldValue("mobile") || "-";
-      const comp = company || form.getFieldValue("company") || "-";
-      const mdl = model || form.getFieldValue("bikeModel") || "-";
-      const varnt = variant || form.getFieldValue("variant") || "-";
-      const priceNum = form.getFieldValue("onRoadPrice") ?? onRoadPrice ?? 0;
-
-    // --- Creative bullet-point WhatsApp message (no "collect points") ---
-const execPhone = (EXECUTIVES.find(e => e.name === executiveName) || {}).phone || "-";
-//const modeTitle = brand === "SHANTHA" ? "Shantha Mode" : "NH Mode";
-
-const header = [
-  `*Hi ${name}, welcome to ${showroomName}! 🚀*`,
-  `_Your quotation is ready—clear, quick & tailored._`,
-  ``
-];
-
-const bullets = [
-  `• *Quotation Date:* ${printDate}`,
-  `• *Vehicle:* ${comp} ${mdl} ${varnt}`,
-  `• *On-Road Price:* ${inr0(priceNum)}`,
-];
-
-if (mode === "loan") {
-  bullets.push(
-    `• *EMI (approx.):*`,
-    `   – Down Payment: ${inr0(downPayment || 0)}`,
-    ...tenures.map((mo) => `   – ${mo} months: ${inr0(monthlyFor(mo))}`)
-  );
-}
-
-bullets.push(
-  `• *Executive:* ${executiveName || "-"} (${execPhone})`,
-  `• *Note:* Prices are indicative and subject to change without prior notice.`
-);
-
-const lines = [...header, ...bullets];
-
-
-      const text = lines.join("\n");
-      const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
-
-      // Try opening in a new tab (web) or app
-      const w = window.open(url, "_blank", "noopener,noreferrer");
-      if (!w) {
-        // fallback if popup blocked
-        window.location.href = url;
-      }
-    } catch  {
-      // validation failed
-      message.warning("Please fill all required fields before sending on WhatsApp.");
+    // Normalize phone to E.164 (India) without plus
+    const phone = toE164NoPlusIndia(v.mobile); // ✅ convert user input to WhatsApp-ready number
+    if (!phone) {
+      message.error("Enter a valid 10-digit Indian mobile to open WhatsApp."); // 🚫 block if invalid
+      return; // 🚪 exit early on invalid number
     }
-  };
+
+    // Pull values from props or form, with safe fallbacks
+    const showroomName = (brand === "SHANTHA" ? "Shantha Motors" : "NH Motors"); // 🏬 dynamic showroom name
+    const name   = (form.getFieldValue("name") || "-").trim(); // 👤 customer name (trimmed)
+    const comp   = (company || form.getFieldValue("company") || "-").trim(); // 🏍️ company/brand
+    const mdl    = (model   || form.getFieldValue("bikeModel") || "-").trim(); // 🧩 model
+    const varnt  = (variant || form.getFieldValue("variant")   || "-").trim(); // 🧾 variant
+    const priceNum = form.getFieldValue("onRoadPrice") ?? onRoadPrice ?? 0; // 💰 on-road price fallback
+
+    // Resolve executive phone from list, if available
+    const execPhone = (EXECUTIVES.find(e => e.name === executiveName) || {}).phone || "-"; // 📞 advisor contact
+
+    // Compute a human-friendly date (IST) for the quotation label
+    const printDate = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); // 🗓️ e.g., 08 Sep 2025
+
+    // Graceful fallbacks for loan-related helpers
+    const monthly = (typeof monthlyFor === "function") ? monthlyFor :() => 0; // 📉 EMI helper fallback
+    const tenureList = Array.isArray(tenures) && tenures.length ? tenures : ["12","24","36","48"]; // 🗓️ default tenures
+
+    // ---------- Message copy (short, warm, impressive) ----------
+    // Header: warm welcome + positioning
+    const header = [
+      `*Hi ${name}, welcome to ${showroomName}! 🚀*`,                                   // 👋 greeting
+      `_Your personalized quotation is ready — clear, quick & tailored for you._`,     // ✨ value promise
+      ``                                                                               // (blank line)
+    ]; // 🧩 header lines
+
+    // Core bullets: essentials always shown
+    const bullets = [
+      `• *Quotation Date:* ${printDate}`,                                              // 🗓️ date
+      `• *Vehicle:* ${comp} ${mdl} ${varnt}`,                                          // 🏍️ selection
+      `• *On-Road Price:* ${inr0(priceNum)}`,                                          // 💰 price (formatted)
+    ]; // 🔹 core details
+
+    // Loan section: appended only when mode === "loan"
+    if (mode === "loan") {                                                             // 🔁 loan-only block
+      bullets.push(
+        `• *EMI Options (approx.):*`,                                                 // 🧮 EMI header
+        `   – Down Payment: ${inr0(downPayment || 0)}`,                                // 💳 down payment
+        ...tenureList.map((mo) => `   – ${mo} months: ${inr0(monthly(mo))}`)           // 📆 EMI per tenure
+      ); // ➕ EMI lines
+    } // ✅ conditional EMI block
+
+    // Trust + contact + clarity
+    bullets.push(
+      `• *Sales Advisor:* ${executiveName || "-"} (${execPhone})`,                     // 👨‍💼 advisor
+      `• *Note:* Prices are indicative and may change without prior notice.`           // 📝 disclaimer
+    ); // 🔚 bullets extension
+
+    // CTA & brand line: crisp, action-oriented
+    const cta = [
+      ``,
+      `✨ *${showroomName} — Ride with Pride, Drive with Confidence.* ✨`               // 🏁 brand promise
+    ]; // 📣 strong closing
+
+    // Merge all lines into a single message
+    const lines = [...header, ...bullets, ...cta];                                     // 🧵 combine
+    const text = lines.join("\n");                                                     // 🔗 newline-joined message
+
+    // Build wa.me URL with encoded text
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;             // 🔗 WhatsApp deep link
+
+    // Open in new tab if possible, else fall back to redirect
+    const w = window.open(url, "_blank", "noopener,noreferrer");                       // 🪟 try popup
+    if (!w) {                                                                          // ❌ popup blocked
+      window.location.href = url;                                                      // 🔁 fallback navigation
+    } // ✅ open WhatsApp chat with composed text
+
+  } catch {                                                                            // 🧯 validation failure / unexpected error
+    message.warning("Please fill all required fields before sending on WhatsApp.");    // 🔔 user feedback
+  } // 🔚 try/catch
+}; // 🔚 handleWhatsAppClick
+
 
   const PrintList = ({ items }) => {
     if (!items?.length) return <span>-</span>;
@@ -835,6 +854,14 @@ const lines = [...header, ...bullets];
 
               {/* Actions */}
               <Col span={24} style={{ textAlign: "right" }}>
+                 <Button
+                  className="no-print"
+                  onClick={handleSaveClick}
+                  style={{ marginRight: 8 }}
+                  type="default"
+                >
+                  Save
+                </Button>
                 {/* NEW: WhatsApp */}
                 <Button
                   className="no-print"
@@ -844,14 +871,7 @@ const lines = [...header, ...bullets];
                   WhatsApp
                 </Button>
 
-                <Button
-                  className="no-print"
-                  onClick={handleSaveClick}
-                  style={{ marginRight: 8 }}
-                  type="default"
-                >
-                  Save
-                </Button>
+               
 
                 <Button className="no-print" type="primary" icon={<PrinterOutlined />} onClick={handlePrint}>
                   Print
