@@ -1,13 +1,24 @@
-import React from "react";
+import React, { forwardRef } from "react";
 import { inr, fmtDate, tick } from "../utils/printUtils";
 
-export default function PreServiceSheet({
-  active,           // boolean -> printMode === 'pre'
-  vals,             // form values (JobCard.jsx already has this) 
-  labourRows,       // array of {desc, qty, rate}
-   executives = [], 
-  observationLines, // built in JobCard.jsx
-}) {
+/**
+ * How to print this:
+ *   const ref = useRef(null);
+ *   <PreServiceSheet ref={ref} active={true} ... />
+ *   handleSmartPrint(ref.current)
+ *
+ * Pair with the Android-safe print helper I shared earlier (handleSmartPrint).
+ */
+const PreServiceSheet = forwardRef(function PreServiceSheet(
+  {
+    active,            // boolean -> printMode === 'pre'
+    vals,              // form values (JobCard.jsx already has this)
+    labourRows,        // array of {desc, qty, rate}
+    executives = [],
+    observationLines,  // built in JobCard.jsx
+  },
+  ref
+) {
   // --- Helpers to align observations with labour rows and compute amounts ---
   const norm = (s) =>
     String(s || "")
@@ -44,67 +55,77 @@ export default function PreServiceSheet({
   };
 
   const HSpace = ({ w = "8mm" }) => (
-  <span aria-hidden="true" style={{ display: "inline-block", width: w }} />
-);
+    <span aria-hidden="true" style={{ display: "inline-block", width: w }} />
+  );
 
-const execPhone = (() => {
-  // line explains: normalize whatever is stored in vals.executive
-  const raw = String(vals?.executive || "").trim();
-  // line explains: if the value already looks like a 10-digit number, use it directly
-  const asDigits = raw.replace(/\D/g, "");
-  if (/^\d{10}$/.test(asDigits)) return asDigits;
-  // line explains: otherwise match the name against the EXECUTIVES array and return the phone
-  const match = (executives || []).find((e) => e.name === raw);
-  return match?.phone || null;   // line explains: null → will render "-" later
-})();
+  const execPhone = (() => {
+    const raw = String(vals?.executive || "").trim();
+    const asDigits = raw.replace(/\D/g, "");
+    if (/^\d{10}$/.test(asDigits)) return asDigits;
+    const match = (executives || []).find((e) => e.name === raw);
+    return match?.phone || null;
+  })();
 
-
+  // Normalize floorMat from form (accepts true/false or "Yes"/"No"/"Y"/"N"/"1"/"0")
+  const floorMatYes = (() => {
+    const v = vals?.floorMat;
+    if (typeof v === "boolean") return v;
+    const s = String(v ?? "").trim().toLowerCase();
+    return s === "yes" || s === "y" || s === "true" || s === "1";
+  })();
+  const floorMatNo = vals?.floorMat != null ? !floorMatYes : false;
 
   return (
-    <div className={`print-sheet ${active ? "active" : ""}`}>
+    // 👇 Attach the ref here — parent will pass this to handleSmartPrint(...)
+    <div ref={ref} className={`print-sheet ${active ? "active" : ""}`}>
       <style>{`
-/* antd Segmented blue */
-.blue-segmented .ant-segmented-item-selected {
-  background: #1677ff !important;
-  color: #fff !important;
-  border-color: #1677ff !important;
+/* =========================
+   NEW PRINT BASELINE (A4)
+   ========================= */
+@page { size: A4 portrait; margin: 0; }
+html, body {
+  margin: 0 !important;
+  padding: 0 !important;
+  background: #fff !important;
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, Helvetica, sans-serif;
 }
-.blue-segmented .ant-segmented-thumb { background: #1677ff !important; }
-.blue-segmented .ant-segmented-item:hover { color: #1677ff; }
+img { max-width: 100%; height: auto; background: transparent; }
 
-/* PRINT LAYOUT */
-@page { size: A4 portrait; margin: 0mm; }
-@media screen { .print-sheet { display: none !important; } }
+/* Tame layout quirks during print */
 @media print {
-  html, body { margin: 0 !important; padding: 0 !important; }
+  * { transform: none !important; }
+  .fixed, .sticky, [style*="position: sticky"], [style*="position: fixed"] { position: static !important; }
+  .no-print { display: none !important; }
+}
+
+/* Screen preview */
+@media screen {
+  .print-sheet { display: none !important; }
+}
+
+/* If you still use the "active sheet only" pattern in full app print, keep it: */
+@media print {
   body * { visibility: hidden !important; }                 /* hide all */
-  .print-sheet { display: block !important; }
+  .print-sheet { display: block; }
   .print-sheet.active,
   .print-sheet.active * { visibility: visible !important; } /* show only sheet */
+  .print-sheet:not(.active) { display: none !important; }   /* ensure only one prints */
   .print-sheet.active { position: absolute; inset: 0; width: 100%; } /* start at top-left */
 
-  /* IMPORTANT: avoid blank extra pages by letting height auto */
-  .pre-a4 {
-    display: block !important;
-    min-height: auto !important;
-    height: auto !important;
-  }
+  /* Avoid blank extra pages by letting height auto */
+  .pre-a4 { display: block !important; min-height: auto !important; height: auto !important; }
 
-  /* keep voucher from splitting */
+  /* Keep larger blocks from splitting */
   .voucher { break-inside: avoid; page-break-inside: avoid; }
 }
 
-.print-sheet {
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto;
-  color: #000;
-}
+/* ========== Your existing styles (kept) ========= */
+.print-sheet { color: #000; }
 
-/* Page grid: header | main | voucher(≈1/8 A4) */
-.pre-a4 {
-      /* full A4 height minus margins (screen only; canceled on print) */
-}
-
-/* Content paddings */
+/* Page grid */
+.pre-a4 { /* container for a single A4 page */ }
 .pre-wrap { padding: 4mm; }
 .pre-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm; }
 
@@ -113,20 +134,20 @@ const execPhone = (() => {
 .tiny { font-size: 11px; }
 .label { font-weight: 600; }
 
-/* Titles (one line) */
+/* Titles */
 .title-kn { font-size: 18pt; font-weight: 500; letter-spacing: 1px; }
 .title-en { font-size: 25pt; font-weight: 700; margin-top: 2px; }
 .title-wrap {
   display: flex;
-  align-items: baseline;   /* keeps Kannada baseline aligned to English */
+  align-items: baseline;
   gap: 8px;
-  white-space: nowrap;     /* prevent line break */
+  white-space: nowrap;
 }
 
 /* Grids */
 .row   { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2mm; }
-.row-3 { display: grid; grid-template-columns: 2fr 1fr;   gap: 2mm; }
-.row-2 { display: grid; grid-template-columns: 1fr 1fr;       gap: 2mm; }
+.row-3 { display: grid; grid-template-columns: 2fr 1fr; gap: 2mm; }
+.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm; }
 
 .right { text-align: right; }
 .center { text-align: center; }
@@ -147,28 +168,28 @@ const execPhone = (() => {
 .voucher {
   border-top: 3px dashed #777;
   padding-top: 3mm;
-  height: 60%;             /* fills the fixed 35mm row */
+  height: 60%;
   align-items: stretch;
 }
 
-/* === Brand line (single continuous line in voucher) === */
+/* Brand line */
 .voucher .brand-line{
   display: flex;
   justify-content: center;
   align-items: baseline;
   gap: 8px;
-  white-space: nowrap;         /* keep Kannada + English on one line */
+  white-space: nowrap;
 }
 .voucher .brand-kn{ font-size:18pt; font-weight:500; line-height:1.05; }
 .voucher .brand-en{ font-size:18pt; font-weight:500; line-height:1.05; }
 
-/* Single outer box inside voucher with 3 columns: left | middle | right(=QR) */
+/* Single outer box inside voucher: left | middle | right(=QR) */
 .voucher .box {
   width: 98%;
-   border: 1px solid #111;
+  border: 1px solid #111;
   border-radius: 5mm;
   display: grid;
-  grid-template-columns: 0.7fr 0.9fr 0.5fr;  /* fixed right column for QR */
+  grid-template-columns: 0.7fr 0.9fr 0.5fr;
   gap: 3mm;
   align-items: start;
   text-align: left;
@@ -179,11 +200,9 @@ const execPhone = (() => {
 .voucher .scan { font-size: 13px; font-weight: 600; margin-top: 4px; }
 .voucher .phones { margin-top: 2px; }
 
-/* Damage section (bullets + Yes/No checkboxes + NOTE box) */
+/* Damage section */
 .damage-box { border: 1px solid #111; padding: 2mm; min-width: 38mm; }
 .damage-box .title { font-weight: 700; font-size: 12px; margin-bottom: 2mm; }
-
-/* Bulleted list */
 .damage-list { list-style: disc; padding-left: 5mm; margin: 0 0 3mm 0; }
 .damage-list li { margin: 1mm 0; position: relative; }
 
@@ -206,18 +225,11 @@ const execPhone = (() => {
 }
 
 /* NOTE block below the list */
-.note-box {
-  border-top: 1px dashed #777;
-  margin-top: 3mm;
-  padding-top: 2mm;
-}
+.note-box { border-top: 1px dashed #777; margin-top: 3mm; padding-top: 2mm; }
 .note-title { font-weight: 600; margin-bottom: 1.5mm; }
-.note-area {
-  border: 1px solid #111;
-  height: 45mm;
-  border-radius: 1mm;
-}
-`}</style>
+.note-area { border: 1px solid #111; height: 50mm; border-radius: 1mm; }
+      `}</style>
+
       <div className="pre-a4">
         {/* MAIN CONTENT */}
         <div className="pre-wrap">
@@ -239,9 +251,8 @@ const execPhone = (() => {
 
             {/* RIGHT SIDE (Location) */}
             <div className="center">
-             
               <img src="/location-qr.png" alt="location qr" style={{ height: 60 }} />
-               <div className="scan">Scan for Location</div>
+              <div className="scan">Scan for Location</div>
               <div className="tiny" style={{ marginTop: 3 }}>
                 Mob: 9731366921<br /> 8073283502
               </div>
@@ -260,9 +271,8 @@ const execPhone = (() => {
           {/* Model/Color + Expected Delivery */}
           <div className="row-2" style={{ marginTop: 3 }}>
             <div className="box">
-              <div className="row-2">
+              <div>
                 <div><span className="label">Model:</span> {vals.model || "-"}</div>
-               
               </div>
             </div>
             <div className="box"><span className="label">Expected Delivery Date:</span> {fmtDate(vals.expectedDelivery)}</div>
@@ -274,7 +284,7 @@ const execPhone = (() => {
               <div>{tick(vals.serviceType === "Free")} Free</div>
               <div>{tick(vals.serviceType === "Paid")} Paid</div>
               <HSpace w="50mm" />
-             <div><span className="label">Color:</span> {vals.colour || "-"}</div>
+              <div><span className="label">Color:</span> {vals.colour || "-"}</div>
             </div>
           </div>
 
@@ -342,8 +352,8 @@ const execPhone = (() => {
                     <li>
                       Floor Mat
                       <span className="yn">
-                        Yes <span className="cb"></span>
-                        No <span className="cb"></span>
+                        Yes <span className="cb">{tick(floorMatYes)}</span>
+                        No <span className="cb">{tick(floorMatNo)}</span>
                       </span>
                     </li>
                   </ul>
@@ -358,7 +368,7 @@ const execPhone = (() => {
             </div>
           </div>
 
-          {/* Total Estimated cost: sum of per-observation amounts */}
+          {/* Total Estimated cost */}
           <div className="box" style={{ marginTop: 3 }}>
             <div className="sum-row" style={{ fontWeight: 700 }}>
               <div>Total Estimated Cost</div>
@@ -366,49 +376,49 @@ const execPhone = (() => {
             </div>
           </div>
 
-          {/* Customer name / mobile / call status */}
+          {/* Customer name / mobile */}
           <div className="row-3 box" style={{ marginTop: 3 }}>
-            <div ><span className="label">Customer Name:</span> {vals.custName || "-"}</div>
-            <div ><span className="label">Mobile No:</span> {vals.custMobile || "-"}</div>
+            <div><span className="label">Customer Name:</span> {vals.custName || "-"}</div>
+            <div><span className="label">Mobile No:</span> {vals.custMobile || "-"}</div>
           </div>
         </div>
 
-    {/* VOUCHER STRIP */}
-<div className="pre-wrap voucher">
-  {/* One continuous line: Kannada | English */}
-  <div className="brand-line">
-    <span className="brand-kn">ಶಾಂತ ಮೋಟರ್ಸ್</span>
-    <span> || </span>
-    <span className="brand-en">SHANTHA MOTORS</span>
-  </div>
+        {/* VOUCHER STRIP */}
+        <div className="pre-wrap voucher">
+          {/* One continuous line: Kannada | English */}
+          <div className="brand-line">
+            <span className="brand-kn">ಶಾಂತ ಮೋಟರ್ಸ್</span>
+            <span> || </span>
+            <span className="brand-en">SHANTHA MOTORS</span>
+          </div>
 
-  {/* Three blocks directly below */}
-  <div className="box" style={{ fontSize: "20px", lineHeight: "1.4", marginTop: "2mm" }}>
-    {/* LEFT: Address */}
-    <div className="col">
-      <div><span className="label">Job Card No:</span> {vals?.jcNo || "-"}</div>
-      <div><span className="label">Reg. No:</span> {vals?.regNo || "-"}</div>
-      <div><span className="label">Expected Del. Date:</span> {fmtDate(vals?.expectedDelivery)}</div>
-    </div>
+          {/* Three blocks directly below */}
+          <div className="box" style={{ fontSize: "20px", lineHeight: "1.4", marginTop: "2mm" }}>
+            {/* LEFT */}
+            <div className="col">
+              <div><span className="label">Job Card No:</span> {vals?.jcNo || "-"}</div>
+              <div><span className="label">Reg. No:</span> {vals?.regNo || "-"}</div>
+              <div><span className="label">Expected Del. Date:</span> {fmtDate(vals?.expectedDelivery)}</div>
+            </div>
 
-    {/* MIDDLE: Date / Executive No / Approx amount */}
-    <div className="col">
-      <div><span className="label">Date:</span> {fmtDate(vals?.createdAt)}</div>
-     <div><span className="label">Executive No:</span> {execPhone || "-"}</div>
-      <div><span className="label">Apprx. Service Amount:</span> {inr(estimatedTotal)}</div>
+            {/* MIDDLE */}
+            <div className="col">
+              <div><span className="label">Date:</span> {fmtDate(vals?.createdAt)}</div>
+              <div><span className="label">Executive No:</span> {execPhone || "-"}</div>
+              <div><span className="label">Apprx. Service Amount:</span> {inr(estimatedTotal)}</div>
+            </div>
 
-    </div>
-
-    {/* RIGHT: QR + caption (phones optional; remove if not needed) */}
-    <div className="col col-right">
-      <img src="/location-qr.png" alt="Location QR" className="qr" />
-      <div className="scan">Scan for Location</div>
-      <div className="tiny phones">9731366921 • 8073283502</div>
-    </div>
-  </div>
-</div>
-
+            {/* RIGHT: QR */}
+            <div className="col col-right">
+              <img src="/location-qr.png" alt="Location QR" className="qr" />
+              <div className="scan">Scan for Location</div>
+              <div className="tiny phones">9731366921 • 8073283502</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
-}
+});
+
+export default PreServiceSheet;
