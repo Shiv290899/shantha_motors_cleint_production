@@ -95,6 +95,8 @@ const RATE_HIGH = 11;
 const EXECUTIVES = [
   { name: "Rukmini", phone: "9901678562" },
   { name: "Meghana", phone: "7019974219" },
+  { name: "Shubha", phone: "8971585057" },
+  { name: "Rani", phone: "9108970455" },
   { name: "Nikitha", phone: "9535190015" },
   { name: "Prakash", phone: "9740176476" },
   { name: "Kumar", phone: "7975807667" },
@@ -102,14 +104,13 @@ const EXECUTIVES = [
   { name: "Kavi", phone: "9108970455" },
   { name: "Narasimha", phone: "9900887666" },
   { name: "Kavya", phone: "8073165374" },
-  { name: "Shubha", phone: "8971585057" },
   { name: "Vanitha", phone: "9380729861" },
 ];
 
 const SCOOTER_OPTIONS = [
   "All Round Guard",
   "Side Stand",
-  "Saree Guard",
+  "Ladies Foot Rest",
   "Grip Cover",
   "Seat Cover",
   "Floor Mat",
@@ -132,6 +133,8 @@ const DOCS_REQUIRED = [
   "ATM Card",
   "Local Address Proof",
 ];
+
+const MEGHANA_NAME = "Meghana";
 
 /* ======================
    HELPERS
@@ -291,6 +294,14 @@ export default function Quotation() {
       }
     })();
   }, [form]);
+
+  useEffect(() => {
+  // When NH Motors is selected, default the executive to Meghana once.
+  if (brand === "NH") {
+    form.setFieldsValue({ executive: MEGHANA_NAME }); // or "Meghana"
+  }
+}, [brand, form]);
+
 
   useEffect(() => {
     if (vehicleType === "scooter") {
@@ -515,93 +526,102 @@ export default function Quotation() {
   };
 
   // Updated WhatsApp share handler with a warmer, impressive welcome message
+// --------- UPDATED: WhatsApp deep-link handler (adds highlighted Free Extra Fittings) ----------
 const handleWhatsAppClick = async () => {
   try {
     // Validate essentials before composing the message
     const v = await form.validateFields([
       "serialNo", "name", "mobile",
       "company", "bikeModel", "variant", "onRoadPrice"
-    ]); // ✅ ensure required fields exist
+    ]);
 
     // Normalize phone to E.164 (India) without plus
-    const phone = toE164NoPlusIndia(v.mobile); // ✅ convert user input to WhatsApp-ready number
+    const phone = toE164NoPlusIndia(v.mobile);
     if (!phone) {
-      message.error("Enter a valid 10-digit Indian mobile to open WhatsApp."); // 🚫 block if invalid
-      return; // 🚪 exit early on invalid number
+      message.error("Enter a valid 10-digit Indian mobile to open WhatsApp.");
+      return;
     }
 
-    // Pull values from props or form, with safe fallbacks
-    const showroomName = (brand === "SHANTHA" ? "Shantha Motors" : "NH Motors"); // 🏬 dynamic showroom name
-    const name   = (form.getFieldValue("name") || "-").trim(); // 👤 customer name (trimmed)
-    const comp   = (company || form.getFieldValue("company") || "-").trim(); // 🏍️ company/brand
-    const mdl    = (model   || form.getFieldValue("bikeModel") || "-").trim(); // 🧩 model
-    const varnt  = (variant || form.getFieldValue("variant")   || "-").trim(); // 🧾 variant
-    const priceNum = form.getFieldValue("onRoadPrice") ?? onRoadPrice ?? 0; // 💰 on-road price fallback
+    // Pull values from state/form, with safe fallbacks
+    const showroomName = (brand === "SHANTHA" ? "Shantha Motors" : "NH Motors");
+    const name   = (form.getFieldValue("name") || "-").trim();
+    const comp   = (company || form.getFieldValue("company") || "-").trim();
+    const mdl    = (model   || form.getFieldValue("bikeModel") || "-").trim();
+    const varnt  = (variant || form.getFieldValue("variant")   || "-").trim();
+    const priceNum = form.getFieldValue("onRoadPrice") ?? onRoadPrice ?? 0;
 
-    // Resolve executive phone from list, if available
-    const execPhone = (EXECUTIVES.find(e => e.name === executiveName) || {}).phone || "-"; // 📞 advisor contact
+    // Executive contact
+    const execPhone = (EXECUTIVES.find(e => e.name === executiveName) || {}).phone || "-";
 
-    // Compute a human-friendly date (IST) for the quotation label
-    const printDate = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); // 🗓️ e.g., 08 Sep 2025
+    // Quotation date (IST)
+    const printDate = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 
-    // Graceful fallbacks for loan-related helpers
-    const monthly = (typeof monthlyFor === "function") ? monthlyFor :() => 0; // 📉 EMI helper fallback
-    const tenureList = Array.isArray(tenures) && tenures.length ? tenures : ["12","24","36","48"]; // 🗓️ default tenures
+    // EMI helpers
+    const monthly = (typeof monthlyFor === "function") ? monthlyFor : () => 0;
+    const tenureList = Array.isArray(tenures) && tenures.length ? tenures : ["12","24","36","48"];
+
+    // Selected fittings (highlight only those the user ticked)
+    const selectedFittings = Array.isArray(fittings) ? fittings.filter(Boolean) : [];
+    const selectedDocsReq = Array.isArray(docsReq) ? docsReq.filter(Boolean) : [];
 
     // ---------- Message copy (short, warm, impressive) ----------
-    // Header: warm welcome + positioning
     const header = [
-      `*Hi ${name}, welcome to ${showroomName}! 🚀*`,                                   // 👋 greeting
-      `_Your personalized quotation is ready — clear, quick & tailored for you._`,     // ✨ value promise
-      ``                                                                               // (blank line)
-    ]; // 🧩 header lines
+      `*Hi ${name}, Welcome to ${showroomName}! 🚀*`,
+      `_Your personalized quotation is ready — clear, quick & tailored for you._`,
+      ``
+    ];
 
-    // Core bullets: essentials always shown
     const bullets = [
-      `• *Quotation Date:* ${printDate}`,                                              // 🗓️ date
-      `• *Vehicle:* ${comp} ${mdl} ${varnt}`,                                          // 🏍️ selection
-      `• *On-Road Price:* ${inr0(priceNum)}`,                                          // 💰 price (formatted)
-    ]; // 🔹 core details
+      `• *Quotation Date:* ${printDate}`,
+      `• *Vehicle:* ${comp} ${mdl} ${varnt}`,
+      `• *On-Road Price:* ${inr0(priceNum)}`
+    ];
 
-    // Loan section: appended only when mode === "loan"
-    if (mode === "loan") {                                                             // 🔁 loan-only block
+    if (mode === "loan") {
       bullets.push(
-        `• *EMI Options (approx.):*`,                                                 // 🧮 EMI header
-        `   – Down Payment: ${inr0(downPayment || 0)}`,                                // 💳 down payment
-        ...tenureList.map((mo) => `   – ${mo} months: ${inr0(monthly(mo))}`)           // 📆 EMI per tenure
-      ); // ➕ EMI lines
-    } // ✅ conditional EMI block
+        `• *EMI Options (approx.):*`,
+        `   – Down Payment: ${inr0(downPayment || 0)}`,
+        ...tenureList.map((mo) => `   – ${mo} months: ${inr0(monthly(mo))}`)
+      );
+    }
 
-    // Trust + contact + clarity
+    // ✅ NEW: Highlight Free Extra Fittings the user selected
+    if (selectedFittings.length) {
+      bullets.push(
+        `• *Free Extra Fittings:*`,
+        ...selectedFittings.map(f => `   ✅ ${f}`)
+      );
+    }
+    // ✅ NEW: Highlight Free Extra Fittings the user selected
+    if (selectedDocsReq.length) {
+      bullets.push(
+        `• *Documents Required:*`,
+        ...selectedDocsReq.map(f => `   ✅ ${f}`)
+      );
+    }
+
+    // Contact + note
     bullets.push(
-      `• *Sales Advisor:* ${executiveName || "-"} (${execPhone})`,                     // 👨‍💼 advisor
-      `• *Note:* Prices are indicative and may change without prior notice.`           // 📝 disclaimer
-    ); // 🔚 bullets extension
+      `• *Sales Advisor:* ${executiveName || "-"} (${execPhone})`,
+      `• *Note:* Prices are indicative and may change without prior notice.`
+    );
 
-    // CTA & brand line: crisp, action-oriented
     const cta = [
       ``,
-      `✨ *${showroomName} — Ride with Pride, Drive with Confidence.* ✨`               // 🏁 brand promise
-    ]; // 📣 strong closing
+      `✨ *${showroomName} — Ride with Pride, Drive with Confidence.* ✨`
+    ];
 
-    // Merge all lines into a single message
-    const lines = [...header, ...bullets, ...cta];                                     // 🧵 combine
-    const text = lines.join("\n");                                                     // 🔗 newline-joined message
+    const lines = [...header, ...bullets, ...cta];
+    const text = lines.join("\n");
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
 
-    // Build wa.me URL with encoded text
-    const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;             // 🔗 WhatsApp deep link
+    const w = window.open(url, "_blank", "noopener,noreferrer");
+    if (!w) window.location.href = url;
 
-    // Open in new tab if possible, else fall back to redirect
-    const w = window.open(url, "_blank", "noopener,noreferrer");                       // 🪟 try popup
-    if (!w) {                                                                          // ❌ popup blocked
-      window.location.href = url;                                                      // 🔁 fallback navigation
-    } // ✅ open WhatsApp chat with composed text
-
-  } catch {                                                                            // 🧯 validation failure / unexpected error
-    message.warning("Please fill all required fields before sending on WhatsApp.");    // 🔔 user feedback
-  } // 🔚 try/catch
-}; // 🔚 handleWhatsAppClick
-
+  } catch {
+    message.warning("Please fill all required fields before sending on WhatsApp.");
+  }
+};
 
   const PrintList = ({ items }) => {
     if (!items?.length) return <span>-</span>;
