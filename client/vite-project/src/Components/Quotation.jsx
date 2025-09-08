@@ -148,14 +148,14 @@ const inr0 = (n) =>
     maximumFractionDigits: 0,
   }).format(Math.max(0, Math.round(n || 0)));
 
-const toE164India = (raw) => {
-  const digits = String(raw || "").replace(/\D/g, "");
-  const noLeadZero = digits.replace(/^0+/, "");
-  if (!noLeadZero) return "";
-  if (noLeadZero.length === 10) return `91${noLeadZero}`;
-  if (noLeadZero.startsWith("91") && noLeadZero.length === 12) return noLeadZero;
-  return noLeadZero;
-};
+// const toE164India = (raw) => {
+//   const digits = String(raw || "").replace(/\D/g, "");
+//   const noLeadZero = digits.replace(/^0+/, "");
+//   if (!noLeadZero) return "";
+//   if (noLeadZero.length === 10) return `91${noLeadZero}`;
+//   if (noLeadZero.startsWith("91") && noLeadZero.length === 12) return noLeadZero;
+//   return noLeadZero;
+// };
 
 // Silent submit to Google Form
 const submitToGoogleForm = (entries) => {
@@ -256,13 +256,12 @@ export default function Quotation() {
 
   const pageRef = useRef(null);
   const printDate = useMemo(() => {
-  const d = new Date();
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
-}, []);
-
+    const d = new Date();
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }, []);
 
   // helper to make image paths absolute for the print iframe + cache-bust
   const absBust = (p) => {
@@ -520,43 +519,14 @@ export default function Quotation() {
     return v;
   };
 
-  const handleWhatsApp = async () => {
-    try {
-      await form.validateFields(["name", "mobile", "company", "bikeModel", "variant"]);
-    } catch {
-      message.warning("Please enter Name, Mobile, Company, Model and Variant.");
-      return;
-    }
-
-    let savedOk = true;
+  // NEW: Save button click handler (replaces WhatsApp)
+  const handleSaveClick = async () => {
     try {
       await handleSaveToForm();
+      message.success("Saved successfully.");
     } catch (err) {
-      savedOk = false;
-      console.warn("Silent save failed (continuing to WhatsApp):", err);
-    }
-
-    const customerName = (form.getFieldValue("name") || "").trim();
-    const mobileRaw = form.getFieldValue("mobile");
-    const e164 = toE164India(mobileRaw);
-    const companyVal = company || form.getFieldValue("company") || "";
-    const modelVal = model || form.getFieldValue("bikeModel") || "";
-    const variantVal = variant || form.getFieldValue("variant") || "";
-
-    const adminMsg =
-      `New quotation details:` +
-      `\nName: ${customerName || "-"}` +
-      `\nMobile: ${e164 ? "+" + e164 : (mobileRaw || "-")}` +
-      `\nVehicle: ${[companyVal, modelVal, variantVal].filter(Boolean).join(" ") || "-"}`;
-
-    const adminNumber = "919731366921";
-    const url = `https://wa.me/${adminNumber}?text=${encodeURIComponent(adminMsg)}`;
-    window.open(url, "_blank");
-
-    if (savedOk) {
-      message.success("Saved to sheet and opened WhatsApp with details.");
-    } else {
-      message.warning("Could not save to sheet, but WhatsApp was opened with details.");
+      console.warn("Save failed:", err);
+      message.error("Could not save. Please check required fields and try again.");
     }
   };
 
@@ -811,13 +781,16 @@ export default function Quotation() {
 
               {/* Actions */}
               <Col span={24} style={{ textAlign: "right" }}>
+                {/* RENAMED + REWIRED: Save (no WhatsApp) */}
                 <Button
                   className="no-print"
-                  onClick={handleWhatsApp}
-                  style={{ marginRight: 8, background: "#25D366", color: "#fff", borderColor: "#25D366" }}
+                  onClick={handleSaveClick}
+                  style={{ marginRight: 8 }}
+                  type="default"
                 >
-                  WhatsApp
+                  Save
                 </Button>
+
                 <Button className="no-print" type="primary" icon={<PrinterOutlined />} onClick={handlePrint}>
                   Print
                 </Button>
@@ -1061,7 +1034,3 @@ export default function Quotation() {
     </>
   );
 }
-
-
-
-//one page
