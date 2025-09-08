@@ -148,16 +148,6 @@ const inr0 = (n) =>
     maximumFractionDigits: 0,
   }).format(Math.max(0, Math.round(n || 0)));
 
-// const toE164India = (raw) => {
-//   const digits = String(raw || "").replace(/\D/g, "");
-//   const noLeadZero = digits.replace(/^0+/, "");
-//   if (!noLeadZero) return "";
-//   if (noLeadZero.length === 10) return `91${noLeadZero}`;
-//   if (noLeadZero.startsWith("91") && noLeadZero.length === 12) return noLeadZero;
-//   return noLeadZero;
-// };
-
-// Silent submit to Google Form
 const submitToGoogleForm = (entries) => {
   const iframeName = "gform_silent_target_" + Date.now();
   const iframe = document.createElement("iframe");
@@ -477,8 +467,8 @@ export default function Quotation() {
     try {
       await waitForAssets();
       try { win.focus(); } catch {
-        //ignore
-      }
+        //rnfjj
+       }
       try { win.print(); } catch { window.print(); }
     } finally {
       setTimeout(() => {
@@ -487,20 +477,7 @@ export default function Quotation() {
     }
   };
 
-  // Capture Ctrl/Cmd + P and route to handlePrint
-  useEffect(() => {
-    const onKeyDown = (e) => {
-      const isPrintShortcut =
-        (e.ctrlKey || e.metaKey) && (e.key === "p" || e.key === "P");
-      if (isPrintShortcut) {
-        e.preventDefault();
-        handlePrint();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []); // handlePrint uses stable inner functions/values
-
+  // Save → Google Form
   const handleSaveToForm = async () => {
     const v = await form.validateFields([
       "serialNo", "name", "mobile", "address",
@@ -519,7 +496,6 @@ export default function Quotation() {
     return v;
   };
 
-  // NEW: Save button click handler (replaces WhatsApp)
   const handleSaveClick = async () => {
     try {
       await handleSaveToForm();
@@ -527,6 +503,79 @@ export default function Quotation() {
     } catch (err) {
       console.warn("Save failed:", err);
       message.error("Could not save. Please check required fields and try again.");
+    }
+  };
+
+  // --------- NEW: WhatsApp deep-link (frontend only) ----------
+  const toE164NoPlusIndia = (raw) => {
+    const digits = String(raw || "").replace(/\D/g, "").replace(/^0+/, "");
+    if (digits.length === 10) return `91${digits}`;
+    if (digits.startsWith("91") && digits.length === 12) return digits;
+    return "";
+  };
+
+  const handleWhatsAppClick = async () => {
+    try {
+      // ensure core fields exist, esp. mobile
+      const v = await form.validateFields([
+        "serialNo", "name", "mobile",
+        "company", "bikeModel", "variant", "onRoadPrice"
+      ]);
+
+      const phone = toE164NoPlusIndia(v.mobile);
+      if (!phone) {
+        message.error("Enter a valid 10-digit Indian mobile to open WhatsApp.");
+        return;
+      }
+
+      const showroomName = brand === "SHANTHA" ? "Shantha Motors" : "NH Motors";
+      const serial = form.getFieldValue("serialNo") || "-";
+      const name = form.getFieldValue("name") || "-";
+      const mobile = form.getFieldValue("mobile") || "-";
+      const comp = company || form.getFieldValue("company") || "-";
+      const mdl = model || form.getFieldValue("bikeModel") || "-";
+      const varnt = variant || form.getFieldValue("variant") || "-";
+      const priceNum = form.getFieldValue("onRoadPrice") ?? onRoadPrice ?? 0;
+
+      const lines = [
+        `👋 *Welcome to ${showroomName}!*`,
+        `Here are your quotation details:`,
+        ``,
+        `*Quotation:* ${serial} (${printDate})`,
+        `*Name:* ${name}`,
+        `*Mobile:* ${mobile}`,
+        `*Vehicle:* ${comp} ${mdl} ${varnt}`,
+        `*On-Road Price:* ${inr0(priceNum)}`,
+      ];
+
+      if (mode === "loan") {
+        lines.push(
+          ``,
+          `*Loan & EMI (approx.):*`,
+          `Down Payment: ${inr0(downPayment || 0)}`
+        );
+        const emiLines = tenures.map((mo) => `${mo} months: ${inr0(monthlyFor(mo))}`);
+        lines.push(...emiLines);
+      }
+
+      lines.push(
+        ``,
+        `*Executive:* ${executiveName || "-"}`,
+        `*Note:* Prices are indicative and subject to change without prior notice.`
+      );
+
+      const text = lines.join("\n");
+      const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+
+      // Try opening in a new tab (web) or app
+      const w = window.open(url, "_blank", "noopener,noreferrer");
+      if (!w) {
+        // fallback if popup blocked
+        window.location.href = url;
+      }
+    } catch  {
+      // validation failed
+      message.warning("Please fill all required fields before sending on WhatsApp.");
     }
   };
 
@@ -781,7 +830,15 @@ export default function Quotation() {
 
               {/* Actions */}
               <Col span={24} style={{ textAlign: "right" }}>
-                {/* RENAMED + REWIRED: Save (no WhatsApp) */}
+                {/* NEW: WhatsApp */}
+                <Button
+                  className="no-print"
+                  onClick={handleWhatsAppClick}
+                  style={{ marginRight: 8, background: "#25D366", borderColor: "#25D366", color: "#fff" }}
+                >
+                  WhatsApp
+                </Button>
+
                 <Button
                   className="no-print"
                   onClick={handleSaveClick}
