@@ -465,23 +465,68 @@ export default function Quotation() {
     const doc = win.document;
 
     // Build minimal print document (include <base> for relative URLs and viewport)
-    doc.open();
-    doc.write(`
-      <!doctype html>
-      <html>
-      <head>
-        <meta charset="utf-8"/>
-        <meta name="viewport" content="width=device-width, initial-scale=1"/>
-        <base href="${location.origin}${location.pathname}">
-        <title>Quotation</title>
-        <style>${PRINT_STYLES}</style>
-      </head>
-      <body>
-        <div class="print-wrap"></div>
-      </body>
-      </html>
-    `);
-    doc.close();
+   // ...after doc = win.document;
+
+doc.open();
+doc.write(`
+  <!doctype html>
+  <html>
+  <head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <base href="${location.origin}${location.pathname}">
+    <title>Quotation</title>
+    <style>
+      @page { size: A4 portrait; margin: 0; }
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        font-family: Arial, sans-serif;       /* lock font for consistency */
+      }
+      * { box-sizing: border-box; }
+      .print-wrap { margin: 0 auto; }
+      .page { width: 210mm; min-height: 297mm; padding: 12mm; background: #fff !important; }
+      .sheet { width: 100%; font: 12pt/1.32 Arial, sans-serif; color: #111; page-break-inside: avoid; }
+      .row2 { display: grid; grid-template-columns: 0.8fr 1.4fr; gap: 8px 16px; }
+      .row3 { display: grid; grid-template-columns: 0.5fr 0.8fr 1fr; gap: 10px 16px; }
+      .box { border: 2px solid #000; border-radius: 6px; padding: 8px 10px; background: #fff; }
+      .plist { margin: 0; padding-left: 18px; }
+      .plist li { margin: 0 0 2px; }
+      .title-knhonda { font-size: 30pt; font-weight: 900; letter-spacing: .2px; }
+      .title-kn { font-size: 38pt; font-weight: 900; letter-spacing: .2px; }
+      .title-en { font-size: 20pt; font-weight: 800; margin-top: 2px; }
+      .big-price { font-size: 16pt; font-weight: 900; }
+      .addr-line { font-size: 11pt; }
+      .addr-linehonda { font-size: 12pt; }
+      .hdr-line { display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px; }
+      .hdr-title { flex: 1; display: flex; justify-content: center; }
+      .quo-box { font-size: 17pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; display: inline-block; }
+      .hdr-right { text-align: right; font-weight: 600; }
+      .emibox { border: 2px solid #000; border-radius: 8px; padding: 6px 10px; text-align: center; }
+      .section-title { font-size: 14pt; font-weight: 900; margin-bottom: 4px; }
+      img { max-width: 100%; height: auto; background: transparent; }
+      @media print {
+        * { transform: none !important; }
+        .fixed, .sticky, [style*="position: sticky"], [style*="position: fixed"] { position: static !important; }
+        .no-print { display: none !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="print-wrap"></div>
+  </body>
+  </html>
+`);
+doc.close();
+
+// ⛔️ Do NOT copy app styles into the iframe — delete this if present:
+// Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).forEach(...);
+
+// ...then mount cloned content and continue with waitForAssets() / win.print()
+
 
     // Copy parent stylesheets and inline <style> into the iframe to prevent font/layout loss on Android
     try {
