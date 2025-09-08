@@ -529,7 +529,7 @@ export default function Quotation() {
       }
 
       const showroomName = brand === "SHANTHA" ? "Shantha Motors" : "NH Motors";
-      const serial = form.getFieldValue("serialNo") || "-";
+      //const serial = form.getFieldValue("serialNo") || "-";
       const name = form.getFieldValue("name") || "-";
       const mobile = form.getFieldValue("mobile") || "-";
       const comp = company || form.getFieldValue("company") || "-";
@@ -537,32 +537,39 @@ export default function Quotation() {
       const varnt = variant || form.getFieldValue("variant") || "-";
       const priceNum = form.getFieldValue("onRoadPrice") ?? onRoadPrice ?? 0;
 
-      const lines = [
-        `👋 *Welcome to ${showroomName}!*`,
-        `Here are your quotation details:`,
-        ``,
-        `*Quotation:* ${serial} (${printDate})`,
-        `*Name:* ${name}`,
-        `*Mobile:* ${mobile}`,
-        `*Vehicle:* ${comp} ${mdl} ${varnt}`,
-        `*On-Road Price:* ${inr0(priceNum)}`,
-      ];
+    // --- Creative bullet-point WhatsApp message (no "collect points") ---
+const execPhone = (EXECUTIVES.find(e => e.name === executiveName) || {}).phone || "-";
+//const modeTitle = brand === "SHANTHA" ? "Shantha Mode" : "NH Mode";
 
-      if (mode === "loan") {
-        lines.push(
-          ``,
-          `*Loan & EMI (approx.):*`,
-          `Down Payment: ${inr0(downPayment || 0)}`
-        );
-        const emiLines = tenures.map((mo) => `${mo} months: ${inr0(monthlyFor(mo))}`);
-        lines.push(...emiLines);
-      }
+const header = [
+  `*Hi ${name}, welcome to ${showroomName}! 🚀*`,
+  `_Your quotation is ready—clear, quick & tailored._`,
+  ``
+];
 
-      lines.push(
-        ``,
-        `*Executive:* ${executiveName || "-"}`,
-        `*Note:* Prices are indicative and subject to change without prior notice.`
-      );
+const bullets = [
+  `• *Date:* ${printDate}`,
+  `• *Customer:* ${name}`,
+  `• *Mobile:* ${mobile}`,
+  `• *Vehicle:* ${comp} ${mdl} ${varnt}`,
+  `• *On-Road Price:* ${inr0(priceNum)}`,
+];
+
+if (mode === "loan") {
+  bullets.push(
+    `• *EMI (approx.):*`,
+    `   – Down Payment: ${inr0(downPayment || 0)}`,
+    ...tenures.map((mo) => `   – ${mo} months: ${inr0(monthlyFor(mo))}`)
+  );
+}
+
+bullets.push(
+  `• *Executive:* ${executiveName || "-"} (${execPhone})`,
+  `• *Note:* Prices are indicative and subject to change without prior notice.`
+);
+
+const lines = [...header, ...bullets];
+
 
       const text = lines.join("\n");
       const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
