@@ -252,13 +252,13 @@ function buildWelcomeMsg(vals, totals) {
 
   return (
     `Hi ${name}!\n` +
-    `✅ Your service is booked at Shantha Motors.\n` +
-    `Welcome to Shantha Motors,\n` +
-    `ಶಾಂತಾ ಮೋಟರ್ಸ್‌ಗೆ ಸ್ವಾಗತ.\n\n` +
-    `🧾 JC: ${jc} | 🚘 ${reg}\n` +
+    `✅ Your service is booked at Shantha Motors.\n\n` +
+    `Welcome to *Shantha Motors*,\n` +
+    `ಶಾಂತ ಮೋಟರ್ಸ್‌ಗೆ ಸ್ವಾಗತ.\n\n` +
+    `🧾 Job Card No: ${jc}\n` + `🏍️ ${reg}\n` +
     `📅 Delivery: ${fmtDate}\n` +
-    `💰 ಅಂದಾಜು ವೆಚ್ಚ / Estimate: ${estimate}\n\n` +
-    `ಯಾವುದೇ ಸಹಾಯ ಬೇಕಾದರೆ ಇಲ್ಲಿ ಉತ್ತರಿಸಿ.\n` +
+    `💰 ಅಂದಾಜು ವೆಚ್ಚ / Estimated Amount: ${estimate}\n\n` +
+    `ಯಾವುದೇ ಸಹಾಯ ಬೇಕಾದರೆ ಇಲ್ಲಿ ಸಂಪರ್ಕಿಸಿ.\n` +
     `— ${vals?.executive || "Team"}, ${branch}${execPhone ? ` (☎️ ${execPhone})` : ""}`
   );
 }
