@@ -113,8 +113,14 @@ const writeDoc = (doc, bodyHtml) => {
   <title>Print</title>
   <style>${PRINT_STYLES}</style>
 </head>
-<body>
+<body class="print-host">
   <div class="print-wrap">${bodyHtml}</div>
+  <script>
+    // Fallback for mobile tabs where opener's print() is ignored or slow
+    setTimeout(function () {
+      try { window.print(); } catch (e) {}
+    }, 300);
+  </script>
 </body>
 </html>`);
   doc.close();
@@ -158,7 +164,7 @@ export async function handleSmartPrint(sourceNode) {
 
   if (isMobile) {
     // New-tab flow: most reliable on Android/iOS
-    const win = window.open("", "_blank", "noopener,noreferrer");
+    const win = window.open("", "_blank"); // no features → fewer Android quirks
     if (!win) {
       alert("Please allow pop-ups to print.");
       return;
@@ -166,7 +172,7 @@ export async function handleSmartPrint(sourceNode) {
     writeDoc(win.document, cloned.outerHTML);
     await waitForAssets(win.document);
     try { win.focus(); } catch { /* ignore */ }
-    win.print();
+    try { win.print(); } catch { /* inline fallback in the document will try */ }
     return;
   }
 
