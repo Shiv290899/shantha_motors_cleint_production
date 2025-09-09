@@ -6,7 +6,7 @@ import {
 } from "antd";
 import dayjs from "dayjs";
 import { handleSmartPrint } from "../utils/printUtils"; 
-
+import { FaWhatsapp } from "react-icons/fa";
 import PreServiceSheet from "./PreServiceSheet";
 import PostServiceSheet from "./PostServiceSheet";
 
@@ -222,6 +222,87 @@ function autoSubmitToGoogle(entries) {
 }
 
 /* =========================
+   WHATSAPP / SMS HELPERS
+   ========================= */
+
+/** Get executive phone from your EXECUTIVES array by name */
+function getExecPhone(executives, execName) {
+  const found = executives.find((e) => e.name === execName);
+  return found?.phone || "";
+}
+
+/** Sanitizes a 10-digit Indian mobile number and returns "91<digits>" or "" */
+function normalizeINPhone(raw) {
+  const digits = String(raw || "").replace(/\D/g, "");
+  if (digits.length === 10) return `91${digits}`;
+  if (digits.length === 12 && digits.startsWith("91")) return digits;
+  return "";
+}
+
+/** Builds the exact bilingual message text */
+function buildWelcomeMsg(vals, totals) {
+  const fmtDate =
+    vals?.expectedDelivery ? dayjs(vals.expectedDelivery).format("DD/MM/YYYY") : "—";
+  const execPhone = getExecPhone(EXECUTIVES, vals?.executive);
+  const branch = vals?.branch || "—";
+  const name = vals?.custName || "Customer";
+  const jc = vals?.jcNo || "—";
+  const reg = vals?.regNo || "—";
+  const estimate = inr(totals?.grand ?? 0);
+
+  return (
+    `Hi ${name}!\n` +
+    `✅ Your service is booked at Shantha Motors.\n` +
+    `Welcome to Shantha Motors,\n` +
+    `ಶಾಂತಾ ಮೋಟರ್ಸ್‌ಗೆ ಸ್ವಾಗತ.\n\n` +
+    `🧾 JC: ${jc} | 🚘 ${reg}\n` +
+    `📅 Delivery: ${fmtDate}\n` +
+    `💰 ಅಂದಾಜು ವೆಚ್ಚ / Estimate: ${estimate}\n\n` +
+    `ಯಾವುದೇ ಸಹಾಯ ಬೇಕಾದರೆ ಇಲ್ಲಿ ಉತ್ತರಿಸಿ.\n` +
+    `— ${vals?.executive || "Team"}, ${branch}${execPhone ? ` (☎️ ${execPhone})` : ""}`
+  );
+}
+
+/**
+ * Try opening WhatsApp. If it doesn't open (blocked / not installed),
+ * fall back to SMS composer gracefully.
+ */
+function openWhatsAppOrSMS({ mobileE164, text, onFailToWhatsApp }) {
+  const waUrl = `https://wa.me/${mobileE164}?text=${encodeURIComponent(text)}`;
+
+  // Open WhatsApp in a new tab/window first (best for iPhone Safari)
+  const w = window.open(waUrl, "_blank", "noopener,noreferrer");
+
+  // If the popup was blocked, we immediately fall back to SMS.
+  const blocked = !w || w.closed || typeof w.closed === "undefined";
+  if (blocked) {
+    onFailToWhatsApp?.();
+    // iOS uses &body= ; most Android clients also accept ?body=
+    const smsUrl = `sms:+${mobileE164}?body=${encodeURIComponent(text)}`;
+    window.location.href = smsUrl;
+    return;
+  }
+
+  // If opened, add a short timer—if user closes quickly or WA not installed,
+  // we still offer SMS after ~1s (best-effort).
+  setTimeout(() => {
+    try {
+      if (w.closed) return; // user is in WhatsApp/kept tab open → good
+      // If still open after a second, assume WA didn’t take over → offer SMS.
+      onFailToWhatsApp?.();
+      w.close();
+      const smsUrl = `sms:+${mobileE164}?body=${encodeURIComponent(text)}`;
+      window.location.href = smsUrl;
+    } catch {
+      // Ignore cross-origin checks and still try SMS
+      onFailToWhatsApp?.();
+      const smsUrl = `sms:+${mobileE164}?body=${encodeURIComponent(text)}`;
+      window.location.href = smsUrl;
+    }
+  }, 1000);
+}
+
+/* =========================
    MAIN COMPONENT
    ========================= */
 
@@ -421,6 +502,47 @@ const handleServiceCheckbox = (checkedValues) => {
     ...labourRows.map((r) => r.desc),
     ...(vals?.obs ? vals.obs.split("\n").map((s) => s.trim()).filter(Boolean) : []),
   ];
+
+  // WhatsApp share handler
+const handleShareWhatsApp = async () => {
+  try {
+    // Validate minimum fields we reference in the message
+    await form.validateFields(["custName", "custMobile", "branch"]);
+
+    const valsNow = form.getFieldsValue(true);
+    const mobileE164 = normalizeINPhone(valsNow.custMobile);
+
+    if (!mobileE164) {
+      message.error("Enter a valid 10-digit mobile number (India).");
+      return;
+    }
+
+    const msg = buildWelcomeMsg(valsNow, totals);
+
+    message.loading({ key: "share", content: "Preparing WhatsApp message…" });
+
+    openWhatsAppOrSMS({
+      mobileE164,
+      text: msg,
+      onFailToWhatsApp: () => {
+        message.info({
+          key: "share",
+          content:
+            "WhatsApp may not be available. Falling back to SMS composer…",
+          duration: 2,
+        });
+      },
+    });
+
+    // Slight delay to swap toast
+    setTimeout(() => {
+      message.success({ key: "share", content: "Ready to send.", duration: 2 });
+    }, 800);
+  } catch {
+    message.error("Please complete required fields (Name, Mobile, Branch).");
+  }
+};
+
 
   return (
     <div style={{ padding: screens.xs ? 8 : 16 }}>
@@ -758,6 +880,18 @@ const handleServiceCheckbox = (checkedValues) => {
                 Save (Open Google Form)
               </Button>
             </Col> */}
+
+<Col>
+  <Button
+    type="default"
+    icon={<FaWhatsapp style={{ color: "#25D366" }} />}
+    onClick={handleShareWhatsApp}
+  >
+    WhatsApp/SMS
+  </Button>
+</Col>
+
+
             <Col>
               <Button type="primary" onClick={() => handlePrint("pre")}>
                 Pre-service
