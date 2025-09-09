@@ -102,6 +102,7 @@ img { max-width: 100%; height: auto; background: transparent; }
 
 /* Screen preview */
 @media screen {
+  body:not(.print-host) 
   .print-sheet { display: none !important; }
 }
 
