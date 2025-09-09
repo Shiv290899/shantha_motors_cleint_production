@@ -2,6 +2,7 @@
 import React, { useMemo, forwardRef } from "react";
 import { inr, fmtDate, amountInWords } from "../utils/printUtils";
 
+
 /**
  * Updated for Android-safe printing (when used with handleSmartPrint in parent)
  * - Forwarded ref so parent can pass DOM node to print helper
@@ -190,14 +191,6 @@ img { max-width: 100%; height: auto; background: transparent; }
               </div>
 
               <div className="sum">
-                <div className="sum-pair">
-                  <div className="cell label">Subtotal</div>
-                  <div className="cell value">{inr(subTotal)}</div>
-                </div>
-                <div className="sum-pair">
-                  <div className="cell label">GST @ {gstPct}%</div>
-                  <div className="cell value">{inr(gstAmt)}</div>
-                </div>
                 <div className="sum-pair emph">
                   <div className="cell label">Grand Total</div>
                   <div className="cell value">{inr(grandTotal)}</div>
