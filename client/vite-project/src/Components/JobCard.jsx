@@ -8,7 +8,7 @@ import dayjs from "dayjs";
 import { handleSmartPrint } from "../utils/printUtils"; 
 
 import PreServiceSheet from "./PreServiceSheet";
-import PostServiceSheet from "./PostServiceSheet";
+//import PostServiceSheet from "./PostServiceSheet";
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -763,11 +763,7 @@ const handleServiceCheckbox = (checkedValues) => {
                 Pre-service
               </Button>
             </Col>
-            <Col>
-              <Button onClick={() => handlePrint("post")}>
-                Post-service
-              </Button>
-            </Col>
+            
           </Row>
         </Form>
       </div>
@@ -783,12 +779,7 @@ const handleServiceCheckbox = (checkedValues) => {
         executives={EXECUTIVES}
       />
 
-      <PostServiceSheet
-        ref={postRef}
-        active
-        vals={vals}
-        totals={totals}
-      />
+     
     </div>
   );
 }
