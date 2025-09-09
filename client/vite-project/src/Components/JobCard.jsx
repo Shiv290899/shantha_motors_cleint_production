@@ -1,10 +1,11 @@
 // JobCard.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import {
   Card, Col, DatePicker, Form, Grid, Input,
   InputNumber, Row, Typography, message, Select, Button, Segmented, Checkbox
 } from "antd";
 import dayjs from "dayjs";
+import { handleSmartPrint } from "../utils/printUtils"; 
 
 import PreServiceSheet from "./PreServiceSheet";
 import PostServiceSheet from "./PostServiceSheet";
@@ -37,7 +38,7 @@ const GFORM_ENTRY = {
 
 // Branches
 const BRANCHES = [
-  "Byadahalli",
+  "byadarahalli",
   "Kadabagere",
   "Muddinapalya",
   "D-Group Layout",
@@ -231,7 +232,9 @@ export default function JobCard() {
   const [regDisplay, setRegDisplay] = useState("");
   const [serviceTypeLocal, setServiceTypeLocal] = useState(null); // single selection from checkboxes
   const [vehicleTypeLocal, setVehicleTypeLocal] = useState(null); // Segmented tabs
-  const [printMode, setPrintMode] = useState(null); // 'pre' | 'post' | null
+ // ✅ refs for safe printing
+  const preRef = useRef(null);
+  const postRef = useRef(null);
 
   const initialValues = useMemo(
     () => ({
@@ -351,12 +354,15 @@ const handleServiceCheckbox = (checkedValues) => {
     }
   }, [vehicleTypeLocal, form]);
 
-  // PRINT handling
-  const handlePrint = (which) => {
-    setPrintMode(which);
-    setTimeout(() => window.print(), 30);
-    setTimeout(() => setPrintMode(null), 800);
+   // ✅ PRINT handling with safe pipeline
+  const handlePrint = async (which) => {
+    if (which === "pre") {
+      await handleSmartPrint(preRef.current);
+    } else if (which === "post") {
+      await handleSmartPrint(postRef.current);
+    }
   };
+
 
   // SAVE handling → open Google Form with prefilled values (user-visible)
   // const handleSave = async () => {
@@ -766,9 +772,10 @@ const handleServiceCheckbox = (checkedValues) => {
         </Form>
       </div>
 
-      {/* PRINT SHEETS */}
+       {/* ✅ PRINT SHEETS with refs */}
       <PreServiceSheet
-        active={printMode === "pre"}
+        ref={preRef}
+        active
         vals={vals}
         labourRows={labourRows}
         totals={totals}
@@ -777,7 +784,8 @@ const handleServiceCheckbox = (checkedValues) => {
       />
 
       <PostServiceSheet
-        active={printMode === "post"}
+        ref={postRef}
+        active
         vals={vals}
         totals={totals}
       />
