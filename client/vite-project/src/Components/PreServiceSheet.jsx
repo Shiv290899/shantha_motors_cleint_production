@@ -146,7 +146,7 @@ img { max-width: 100%; height: auto; background: transparent; }
 
 /* Grids */
 .row   { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2mm; }
-.row-3 { display: grid; grid-template-columns: 2fr 1fr; gap: 2mm; }
+.row-3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 2mm; }
 .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm; }
 
 .right { text-align: right; }
@@ -227,7 +227,7 @@ img { max-width: 100%; height: auto; background: transparent; }
 /* NOTE block below the list */
 .note-box { border-top: 1px dashed #777; margin-top: 3mm; padding-top: 2mm; }
 .note-title { font-weight: 600; margin-bottom: 1.5mm; }
-.note-area { border: 1px solid #111; height: 50mm; border-radius: 1mm; }
+.note-area { border: 1px solid #111; height: 69mm; border-radius: 1mm; }
       `}</style>
 
       <div className="pre-a4">
@@ -380,6 +380,7 @@ img { max-width: 100%; height: auto; background: transparent; }
           <div className="row-3 box" style={{ marginTop: 3 }}>
             <div><span className="label">Customer Name:</span> {vals.custName || "-"}</div>
             <div><span className="label">Mobile No:</span> {vals.custMobile || "-"}</div>
+            <div><span className="label">Sign:</span> </div>
           </div>
         </div>
 
@@ -393,12 +394,12 @@ img { max-width: 100%; height: auto; background: transparent; }
           </div>
 
           {/* Three blocks directly below */}
-          <div className="box" style={{ fontSize: "20px", lineHeight: "1.4", marginTop: "2mm" }}>
+          <div className="box" style={{ fontSize: "20px", lineHeight: "1.3", marginTop: "2mm" }}>
             {/* LEFT */}
             <div className="col">
               <div><span className="label">Job Card No:</span> {vals?.jcNo || "-"}</div>
               <div><span className="label">Reg. No:</span> {vals?.regNo || "-"}</div>
-              <div><span className="label">Expected Del. Date:</span> {fmtDate(vals?.expectedDelivery)}</div>
+              <div><span className="label">Exp. Del. Date:</span> {fmtDate(vals?.expectedDelivery)}</div>
             </div>
 
             {/* MIDDLE */}
