@@ -2,7 +2,7 @@
 import dayjs from "dayjs";
 
 /* =========================
-   Basic helpers (existing)
+   Basic helpers
    ========================= */
 
 export const inr = (n) =>
@@ -16,48 +16,17 @@ export const fmtDate = (d) => (d ? dayjs(d).format("DD/MM/YYYY") : "");
 
 export const tick = (cond) => (cond ? "☑" : "☐");
 
-/**
- * Converts a number to Indian currency words, e.g.
- * 12345 -> "Twelve Thousand Three Hundred Forty Five Rupees Only"
- */
+/** Number → Indian currency words (Rupees Only) */
 export const amountInWords = (numInput) => {
   const n = Math.max(0, Math.floor(Number(numInput || 0)));
   if (n === 0) return "Zero Rupees Only";
 
   const ones = [
-    "",
-    "One",
-    "Two",
-    "Three",
-    "Four",
-    "Five",
-    "Six",
-    "Seven",
-    "Eight",
-    "Nine",
-    "Ten",
-    "Eleven",
-    "Twelve",
-    "Thirteen",
-    "Fourteen",
-    "Fifteen",
-    "Sixteen",
-    "Seventeen",
-    "Eighteen",
-    "Nineteen",
+    "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight",
+    "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen",
+    "Sixteen", "Seventeen", "Eighteen", "Nineteen",
   ];
-  const tens = [
-    "",
-    "",
-    "Twenty",
-    "Thirty",
-    "Forty",
-    "Fifty",
-    "Sixty",
-    "Seventy",
-    "Eighty",
-    "Ninety",
-  ];
+  const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
 
   const two = (num) =>
     num < 20 ? ones[num] : tens[Math.floor(num / 10)] + (num % 10 ? " " + ones[num % 10] : "");
@@ -68,7 +37,7 @@ export const amountInWords = (numInput) => {
   };
 
   let out = "";
-  const crore = Math.floor(n / 10000000); // 1,00,00,000
+  const crore = Math.floor(n / 10000000);             // 1,00,00,000
   const lakh = Math.floor((n / 100000) % 100);
   const thousand = Math.floor((n / 1000) % 100);
   const hundred = n % 1000;
@@ -93,6 +62,7 @@ export const absBust = (p) => {
   return src.includes("?") ? `${src}&v=${v}` : `${src}?v=${v}`;
 };
 
+// --- private helpers (not exported) ---
 const convertCanvasToImages = (root) => {
   root.querySelectorAll("canvas").forEach((cnv) => {
     try {
@@ -120,12 +90,11 @@ const PRINT_STYLES = `
   html, body {
     margin: 0 !important; padding: 0 !important; background: #fff !important;
     -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, Helvetica, sans-serif;
   }
   * { box-sizing: border-box; }
-  .print-wrap { margin: 0 auto; }
   img { max-width: 100%; height: auto; background: transparent; }
-  /* Tame layout quirks when printing */
+  .print-wrap { margin: 0 auto; }
   @media print {
     * { transform: none !important; }
     .fixed, .sticky, [style*="position: sticky"], [style*="position: fixed"] { position: static !important; }
@@ -163,14 +132,9 @@ const waitForAssets = async (doc) => {
     )
   );
   if (doc.fonts && doc.fonts.ready) {
-    try {
-      await doc.fonts.ready;
-    } catch {
-      /* ignore */
-    }
+    try { await doc.fonts.ready; } catch { /* ignore */ }
   }
-  // Let the compositor settle a tick
-  await new Promise((res) => setTimeout(res, 200));
+  await new Promise((res) => setTimeout(res, 200)); // compositor settle
 };
 
 /**
@@ -201,11 +165,7 @@ export async function handleSmartPrint(sourceNode) {
     }
     writeDoc(win.document, cloned.outerHTML);
     await waitForAssets(win.document);
-    try {
-      win.focus();
-    } catch {
-      //lig
-    }
+    try { win.focus(); } catch { /* ignore */ }
     win.print();
     return;
   }
@@ -224,18 +184,10 @@ export async function handleSmartPrint(sourceNode) {
   const win = iframe.contentWindow;
   const doc = win.document;
   writeDoc(doc, cloned.outerHTML);
-
   await waitForAssets(doc);
-  try {
-    win.focus();
-  } catch {
-    //gtyf
-  }
-  try {
-    win.print();
-  } catch {
-    window.print();
-  }
+
+  try { win.focus(); } catch { /* ignore */ }
+  try { win.print(); } catch { window.print(); }
 
   setTimeout(() => {
     if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
@@ -247,14 +199,13 @@ export async function handleSmartPrint(sourceNode) {
  * Pass either a node or a getter function that returns the node.
  *
  * Example:
- * useEffect(() => installPrintShortcut(() => ref.current), []);
+ *   const ref = useRef(null);
+ *   useEffect(() => installPrintShortcut(() => ref.current), []);
  */
 export function installPrintShortcut(getNode) {
   const onKeyDown = (e) => {
-    const isPrintShortcut =
-      (e.ctrlKey || e.metaKey) && (e.key === "p" || e.key === "P");
+    const isPrintShortcut = (e.ctrlKey || e.metaKey) && (e.key === "p" || e.key === "P");
     if (!isPrintShortcut) return;
-
     e.preventDefault();
     const node = typeof getNode === "function" ? getNode() : getNode;
     handleSmartPrint(node);
