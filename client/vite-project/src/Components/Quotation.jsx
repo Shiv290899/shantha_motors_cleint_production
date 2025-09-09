@@ -1,9 +1,9 @@
 // QuotationOnePage.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Row, Col, Form, Input, InputNumber, Select, Button, Radio, message, Checkbox, Switch,
+  Row, Col, Form, Input, InputNumber, Select, Button, Radio, message, Checkbox, Switch, Divider
 } from "antd";
-import { PrinterOutlined } from "@ant-design/icons";
+import { PrinterOutlined, PlusOutlined, DeleteOutlined } from "@ant-design/icons";
 
 /* ======================
    GOOGLE FORM INTEGRATION
@@ -215,6 +215,18 @@ async function getNextSerial() {
 }
 
 /* ======================
+   SMALL UTIL FOR VEHICLE RECORDS
+   ====================== */
+const makeEmptyVehicle = () => ({
+  company: "",
+  model: "",
+  variant: "",
+  onRoadPrice: 0,
+  downPayment: 0,
+  emiSet: "12", // "12" or "48"
+});
+
+/* ======================
    COMPONENT
    ====================== */
 export default function Quotation() {
@@ -244,6 +256,8 @@ export default function Quotation() {
   const [vehicleType, setVehicleType] = useState("scooter");
   const [fittings, setFittings] = useState(["Side Stand", "Floor Mat", "ISI Helmet", "Grip Cover"]);
   const [docsReq, setDocsReq] = useState(DOCS_REQUIRED);
+
+  const [extraVehicles, setExtraVehicles] = useState([]); // up to 2 records (V2, V3)
 
   const executiveName = Form.useWatch("executive", form) || EXECUTIVES[0].name;
 
@@ -296,12 +310,11 @@ export default function Quotation() {
   }, [form]);
 
   useEffect(() => {
-  // When NH Motors is selected, default the executive to Meghana once.
-  if (brand === "NH") {
-    form.setFieldsValue({ executive: MEGHANA_NAME }); // or "Meghana"
-  }
-}, [brand, form]);
-
+    // When NH Motors is selected, default the executive to Meghana once.
+    if (brand === "NH") {
+      form.setFieldsValue({ executive: MEGHANA_NAME });
+    }
+  }, [brand, form]);
 
   useEffect(() => {
     if (vehicleType === "scooter") {
@@ -339,17 +352,21 @@ export default function Quotation() {
     }
   };
 
-  const dpPct = onRoadPrice > 0 ? downPayment / onRoadPrice : 0;
-  const rate = dpPct >= 0.3 ? RATE_LOW : RATE_HIGH;
-
-  const monthlyFor = (months) => {
-    const base = Math.max(Number(onRoadPrice || 0) - Number(downPayment || 0), 0);
-    const principal = base + PROCESSING_FEE;
+  // ------ Per-vehicle EMI helpers ------
+  const rateFor = (price, dp) => {
+    const dpPct = price > 0 ? (dp || 0) / price : 0;
+    return dpPct >= 0.3 ? RATE_LOW : RATE_HIGH;
+  };
+  const monthlyFor = (price, dp, months) => {
+    const principalBase = Math.max(Number(price || 0) - Number(dp || 0), 0);
+    const principal = principalBase + PROCESSING_FEE;
     const years = months / 12;
+    const rate = rateFor(price, dp);
     const totalInterest = principal * (rate / 100) * years;
     const total = principal + totalInterest;
     return months > 0 ? total / months : 0;
   };
+  const tenuresForSet = (s) => (s === "12" ? [12, 18, 24, 30] : [24, 30, 36, 48]);
 
   // ---------- Android-proof A4 print ----------
   const handlePrint = async () => {
@@ -358,8 +375,15 @@ export default function Quotation() {
         "serialNo", "name", "mobile", "address",
         "company", "bikeModel", "variant", "onRoadPrice",
       ]);
-    } catch {
-      message.warning("Fix the highlighted fields before printing.");
+      // validate extra vehicles if present
+      for (let i = 0; i < extraVehicles.length; i++) {
+        const v = extraVehicles[i];
+        if (!v.company || !v.model || !v.variant || !v.onRoadPrice) {
+          throw new Error(`Please complete Vehicle ${i + 2} details before printing.`);
+        }
+      }
+    } catch (e) {
+      message.warning(e?.message || "Fix the highlighted fields before printing.");
       return;
     }
 
@@ -371,68 +395,122 @@ export default function Quotation() {
 
     const cloned = page.cloneNode(true);
 
- // canvas -> img (Android print-safe)
-  cloned.querySelectorAll("canvas").forEach(cnv => {
-    try {
-      const img = document.createElement("img");
-      img.alt = cnv.getAttribute("aria-label") || "canvas";
-      img.src = cnv.toDataURL("image/png");
-      img.style.maxWidth = "100%";
-      img.style.height = "auto";
-      cnv.parentNode && cnv.parentNode.replaceChild(img, cnv);
-    } catch {
-      //ignore
+    // canvas -> img (Android print-safe)
+    cloned.querySelectorAll("canvas").forEach(cnv => {
+      try {
+        const img = document.createElement("img");
+        img.alt = cnv.getAttribute("aria-label") || "canvas";
+        img.src = cnv.toDataURL("image/png");
+        img.style.maxWidth = "100%";
+        img.style.height = "auto";
+        cnv.parentNode && cnv.parentNode.replaceChild(img, cnv);
+      } catch { /* ignore */ }
+    });
+
+    // absolute + cache-busted images
+    cloned.querySelectorAll("img").forEach(img => {
+      const src = img.getAttribute("src");
+      if (src && !src.startsWith("data:")) img.setAttribute("src", absBust(src));
+    });
+
+    const PRINT_STYLES = `
+      @page { size: A4 portrait; margin: 0; }
+      html, body {
+        margin: 0 !important; padding: 0 !important; background: #fff !important;
+        -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
+        font-family: Arial, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      .print-wrap { margin: 0 auto; }
+      .page { width: 210mm; min-height: 297mm; padding: 12mm; background: #fff !important; }
+      .sheet { width: 100%; font: 12pt/1.32 Arial, sans-serif; color: #111; page-break-inside: avoid; }
+      .row2 { display: grid; grid-template-columns: 0.8fr 1.4fr; gap: 8px 16px; }
+      .row3 { display: grid; grid-template-columns: 0.5fr 0.8fr 1fr; gap: 10px 16px; }
+      .box { border: 2px solid #000; border-radius: 6px; padding: 8px 10px; background: #fff; }
+      .plist { margin: 0; padding-left: 18px; } .plist li { margin: 0 0 2px; }
+      .title-knhonda { font-size: 30pt; font-weight: 900; letter-spacing: .2px; }
+      .title-kn { font-size: 32pt; font-weight: 500; letter-spacing: .2px; }
+      .title-en { font-size: 18pt; font-weight: 600; margin-top: 2px; }
+      .big-price { font-size: 16pt; font-weight: 900; }
+      .addr-line { font-size: 11pt; } .addr-linehonda { font-size: 12pt; }
+      .hdr-line { display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px; }
+      .hdr-title { flex: 1; display: flex; justify-content: center; }
+      .quo-box { font-size: 17pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; display: inline-block; }
+      .hdr-right { text-align: right; font-weight: 600; }
+      .emibox { border: 2px solid #000; border-radius: 8px; padding: 6px 10px; text-align: center; }
+      .section-title { font-size: 14pt; font-weight: 900; margin-bottom: 4px; }
+      img { max-width: 100%; height: auto; background: transparent; }
+      @media print {
+        * { transform: none !important; }
+        .fixed, .sticky, [style*="position: sticky"], [style*="position: fixed"] { position: static !important; }
+        .no-print { display: none !important; }
+      }
+    `;
+
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    if (isMobile) {
+      const win = window.open("", "_blank");
+      if (!win) { message.error("Please allow pop-ups to print."); return; }
+      const doc = win.document;
+
+      doc.open();
+      doc.write(`
+        <!doctype html>
+        <html>
+        <head>
+          <meta charset="utf-8"/>
+          <meta name="viewport" content="width=device-width, initial-scale=1"/>
+          <base href="${location.origin}${location.pathname}">
+          <title>Quotation</title>
+          <style>${PRINT_STYLES}</style>
+        </head>
+        <body>
+          <div class="print-wrap"></div>
+        </body>
+        </html>
+      `);
+      doc.close();
+
+      const mount = doc.querySelector(".print-wrap");
+      const node = doc.importNode(cloned, true);
+      mount.appendChild(node);
+
+      const waitForAssets = async () => {
+        const imgs = Array.from(doc.images || []);
+        await Promise.all(
+          imgs.map(img =>
+            (img.complete && img.naturalWidth)
+              ? Promise.resolve()
+              : new Promise(res => { img.onload = img.onerror = () => res(); })
+          )
+        );
+        if (doc.fonts && doc.fonts.ready) { try { await doc.fonts.ready; } catch {
+          //ign
+        } }
+        await new Promise(res => setTimeout(res, 200));
+      };
+
+      await waitForAssets();
+      try { win.focus(); } catch {
+        //iih
+      }
+      win.print();
+      return;
     }
-  });
 
+    // Desktop: iframe flow
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.setAttribute("aria-hidden", "true");
+    document.body.appendChild(iframe);
 
-  // absolute + cache-busted images
-  cloned.querySelectorAll("img").forEach(img => {
-    const src = img.getAttribute("src");
-    if (src && !src.startsWith("data:")) img.setAttribute("src", absBust(src));
-  });
-
- const PRINT_STYLES = `
-    @page { size: A4 portrait; margin: 0; }
-    html, body {
-      margin: 0 !important; padding: 0 !important; background: #fff !important;
-      -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
-      font-family: Arial, sans-serif;
-    }
-    * { box-sizing: border-box; }
-    .print-wrap { margin: 0 auto; }
-    .page { width: 210mm; min-height: 297mm; padding: 12mm; background: #fff !important; }
-    .sheet { width: 100%; font: 12pt/1.32 Arial, sans-serif; color: #111; page-break-inside: avoid; }
-    .row2 { display: grid; grid-template-columns: 0.8fr 1.4fr; gap: 8px 16px; }
-    .row3 { display: grid; grid-template-columns: 0.5fr 0.8fr 1fr; gap: 10px 16px; }
-    .box { border: 2px solid #000; border-radius: 6px; padding: 8px 10px; background: #fff; }
-    .plist { margin: 0; padding-left: 18px; } .plist li { margin: 0 0 2px; }
-    .title-knhonda { font-size: 30pt; font-weight: 900; letter-spacing: .2px; }
-    .title-kn { font-size: 38pt; font-weight: 900; letter-spacing: .2px; }
-    .title-en { font-size: 20pt; font-weight: 800; margin-top: 2px; }
-    .big-price { font-size: 16pt; font-weight: 900; }
-    .addr-line { font-size: 11pt; } .addr-linehonda { font-size: 12pt; }
-    .hdr-line { display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px; }
-    .hdr-title { flex: 1; display: flex; justify-content: center; }
-    .quo-box { font-size: 17pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; display: inline-block; }
-    .hdr-right { text-align: right; font-weight: 600; }
-    .emibox { border: 2px solid #000; border-radius: 8px; padding: 6px 10px; text-align: center; }
-    .section-title { font-size: 14pt; font-weight: 900; margin-bottom: 4px; }
-    img { max-width: 100%; height: auto; background: transparent; }
-    @media print {
-      * { transform: none !important; }
-      .fixed, .sticky, [style*="position: sticky"], [style*="position: fixed"] { position: static !important; }
-      .no-print { display: none !important; }
-    }
-  `;
-
-
-  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-  if (isMobile) {
-    // ✅ Open a new tab immediately (keeps user gesture alive on mobile)
-    const win = window.open("", "_blank");
-    if (!win) { message.error("Please allow pop-ups to print."); return; }
+    const win = iframe.contentWindow;
     const doc = win.document;
 
     doc.open();
@@ -453,10 +531,8 @@ export default function Quotation() {
     `);
     doc.close();
 
-// adopt/import the cloned node into the new document
     const mount = doc.querySelector(".print-wrap");
-    const node = doc.importNode(cloned, true);
-    mount.appendChild(node);
+    mount.appendChild(doc.importNode(cloned, true));
 
     const waitForAssets = async () => {
       const imgs = Array.from(doc.images || []);
@@ -468,82 +544,21 @@ export default function Quotation() {
         )
       );
       if (doc.fonts && doc.fonts.ready) { try { await doc.fonts.ready; } catch {
-        //igg
+        //iji
       } }
       await new Promise(res => setTimeout(res, 200));
     };
 
-    await waitForAssets();
-    try { win.focus(); } catch {
-      //og
+    try {
+      await waitForAssets();
+      try { win.focus(); } catch {
+        //kbj
+      }
+      try { win.print(); } catch { window.print(); }
+    } finally {
+      setTimeout(() => { iframe.parentNode && iframe.parentNode.removeChild(iframe); }, 800);
     }
-    win.print();
-    // Optionally close after print on mobile:
-    // setTimeout(() => { try { win.close(); } catch {} }, 500);
-    return;
-  }
-
-  // Desktop: iframe flow (works fine)
-  const iframe = document.createElement("iframe");
-  iframe.style.position = "fixed";
-  iframe.style.right = "0";
-  iframe.style.bottom = "0";
-  iframe.style.width = "0";
-  iframe.style.height = "0";
-  iframe.style.border = "0";
-  iframe.setAttribute("aria-hidden", "true");
-  document.body.appendChild(iframe);
-
-  const win = iframe.contentWindow;
-  const doc = win.document;
-
-  doc.open();
-  doc.write(`
-    <!doctype html>
-    <html>
-    <head>
-      <meta charset="utf-8"/>
-      <meta name="viewport" content="width=device-width, initial-scale=1"/>
-      <base href="${location.origin}${location.pathname}">
-      <title>Quotation</title>
-      <style>${PRINT_STYLES}</style>
-    </head>
-    <body>
-      <div class="print-wrap"></div>
-    </body>
-    </html>
-  `);
-  doc.close();
-
-  const mount = doc.querySelector(".print-wrap");
-  mount.appendChild(doc.importNode(cloned, true));
-
-  const waitForAssets = async () => {
-    const imgs = Array.from(doc.images || []);
-    await Promise.all(
-      imgs.map(img =>
-        (img.complete && img.naturalWidth)
-          ? Promise.resolve()
-          : new Promise(res => { img.onload = img.onerror = () => res(); })
-      )
-    );
-    if (doc.fonts && doc.fonts.ready) { try { await doc.fonts.ready; } catch {
-      //jijh
-    } }
-    await new Promise(res => setTimeout(res, 200));
   };
-
-  try {
-    await waitForAssets();
-    try { win.focus(); } catch {
-      //kgk
-    }
-    try { win.print(); } catch { window.print(); }
-  } finally {
-    setTimeout(() => { iframe.parentNode && iframe.parentNode.removeChild(iframe); }, 800);
-  }
-};
-
 
   // Capture Ctrl/Cmd + P and route to handlePrint
   useEffect(() => {
@@ -559,12 +574,19 @@ export default function Quotation() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []); // handlePrint uses stable inner functions/values
 
-
-const handleSaveToForm = async () => {
+  const handleSaveToForm = async () => {
     const v = await form.validateFields([
       "serialNo", "name", "mobile", "address",
       "company", "bikeModel", "variant", "onRoadPrice", "executive", "remarks",
     ]);
+
+    // validate extra vehicles if present
+    for (let i = 0; i < extraVehicles.length; i++) {
+      const ev = extraVehicles[i];
+      if (!ev.company || !ev.model || !ev.variant || !ev.onRoadPrice) {
+        throw new Error(`Please complete Vehicle ${i + 2} before saving.`);
+      }
+    }
 
     if (!v.serialNo) {
       const serial = await getNextSerial();
@@ -572,7 +594,21 @@ const handleSaveToForm = async () => {
       form.setFieldsValue({ serialNo: serial });
     }
 
-    const entries = toEntries(v, executiveName);
+    // Build Option C: concatenate V1/V2/V3 in remarks
+    const v1 = {
+      company: v.company, model: v.bikeModel, variant: v.variant,
+      
+    };
+    const all = [v1, ...extraVehicles];
+    const lines = all.map((it, idx) => {
+      const title = `V${idx + 1}`;
+      const tset = tenuresForSet(it.emiSet || "12");
+      const emiLine = tset.map(mo => `${mo}m ${inr0(monthlyFor(it.price || it.onRoadPrice, it.downPayment || it.dp || 0, mo))}`).join(", ");
+      return `${title}: ${it.company} ${it.model} ${it.variant} | Price ${inr0(it.price || it.onRoadPrice)} | DP ${inr0(it.downPayment || it.dp || 0)} | EMI ${emiLine}`;
+    });
+
+    const mergedRemarks = [v.remarks?.trim() || "", ...lines].filter(Boolean).join(" | ");
+    const entries = toEntries({ ...v, remarks: mergedRemarks }, executiveName);
     submitToGoogleForm(entries);
 
     return v;
@@ -584,10 +620,11 @@ const handleSaveToForm = async () => {
       message.success("Saved successfully.");
     } catch (err) {
       console.warn("Save failed:", err);
-      message.error("Could not save. Please check required fields and try again.");
+      message.error(err?.message || "Could not save. Please check required fields and try again.");
     }
   };
- // --------- NEW: WhatsApp deep-link (frontend only) ----------
+
+  // --------- WhatsApp deep-link ----------
   const toE164NoPlusIndia = (raw) => {
     const digits = String(raw || "").replace(/\D/g, "").replace(/^0+/, "");
     if (digits.length === 10) return `91${digits}`;
@@ -595,107 +632,175 @@ const handleSaveToForm = async () => {
     return "";
   };
 
-  // Updated WhatsApp share handler with a warmer, impressive welcome message
-// --------- UPDATED: WhatsApp deep-link handler (adds highlighted Free Extra Fittings) ----------
-const handleWhatsAppClick = async () => {
-  try {
-    // Validate essentials before composing the message
-    const v = await form.validateFields([
-      "serialNo", "name", "mobile",
-      "company", "bikeModel", "variant", "onRoadPrice"
-    ]);
+  const handleWhatsAppClick = async () => {
+    try {
+      // Validate essentials before composing the message
+      const v = await form.validateFields([
+        "serialNo", "name", "mobile",
+        "company", "bikeModel", "variant", "onRoadPrice"
+      ]);
 
-    // Normalize phone to E.164 (India) without plus
-    const phone = toE164NoPlusIndia(v.mobile);
-    if (!phone) {
-      message.error("Enter a valid 10-digit Indian mobile to open WhatsApp.");
-      return;
+      // validate extra vehicles if present
+      for (let i = 0; i < extraVehicles.length; i++) {
+        const ev = extraVehicles[i];
+        if (!ev.company || !ev.model || !ev.variant || !ev.onRoadPrice) {
+          throw new Error(`Please complete Vehicle ${i + 2} before WhatsApp.`);
+        }
+      }
+
+      const phone = toE164NoPlusIndia(v.mobile);
+      if (!phone) {
+        message.error("Enter a valid 10-digit Indian mobile to open WhatsApp.");
+        return;
+      }
+
+      const showroomName = (brand === "SHANTHA" ? "Shantha Motors" : "NH Motors");
+      const name   = (form.getFieldValue("name") || "-").trim();
+
+      // V1 (main)
+      const comp1   = (company || form.getFieldValue("company") || "-").trim();
+      const mdl1    = (model   || form.getFieldValue("bikeModel") || "-").trim();
+      const varnt1  = (variant || form.getFieldValue("variant")   || "-").trim();
+      const price1  = form.getFieldValue("onRoadPrice") ?? onRoadPrice ?? 0;
+      const dp1     = downPayment || 0;
+      //const tset1   = tenuresForSet(emiSet);
+
+      // V2..V3
+      const vehicles = [
+        { title: "Vehicle 1", company: comp1, model: mdl1, variant: varnt1, price: price1, dp: dp1, emiSet },
+        ...extraVehicles.map((ev, i) => ({
+          title: `Vehicle ${i + 2}`,
+          company: ev.company,
+          model: ev.model,
+          variant: ev.variant,
+          price: ev.onRoadPrice,
+          dp: ev.downPayment || 0,
+          emiSet: ev.emiSet || "12",
+        })),
+      ];
+
+      const execPhone = (EXECUTIVES.find(e => e.name === executiveName) || {}).phone || "-";
+      const printDate = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+
+      // Header
+      const header = [
+        `*Hi ${name}, Welcome to ${showroomName}! 🚀*`,
+        `_Your personalized quotation is ready — with multiple options tailored for you._`,
+        ``,
+        `• *Quotation Date:* ${printDate}`,
+      ];
+
+      // Vehicle sections
+      const vblocks = vehicles.map((it) => {
+        const tset = tenuresForSet(it.emiSet);
+        const emiLines = (mode === "loan")
+          ? [
+              `   – Down Payment: ${inr0(it.dp || 0)}`,
+              ...tset.map((mo) => `   – ${mo} months: ${inr0(monthlyFor(it.price, it.dp || 0, mo))}`)
+            ]
+          : [];
+        return [
+          ``,
+          `*${it.title}:*`,
+          `• *Vehicle:* ${it.company} ${it.model} ${it.variant}`,
+          `• *On-Road Price:* ${inr0(it.price)}`,
+          ...(mode === "loan" ? [`• *EMI Options (approx.):*`, ...emiLines] : []),
+        ].join("\n");
+      });
+
+      const footer = [
+        ``,
+        `• *Sales Advisor:* ${executiveName || "-"} (${execPhone})`,
+        `• *Note:* Prices are indicative and may change without prior notice.`,
+        ``,
+        `✨ *${showroomName} — Ride with Pride, Drive with Confidence.* ✨`
+      ];
+
+      // Add Free Fittings + Documents sections to the message
+const selectedFittings = Array.isArray(fittings) ? fittings.filter(Boolean) : [];
+const selectedDocsReq = Array.isArray(docsReq) ? docsReq.filter(Boolean) : [];
+
+const afterVehicles = [
+  ``,
+  ...(selectedFittings.length
+    ? [`*Free Extra Fittings:*`, ...selectedFittings.map(f => `   ✅ ${f}`)]
+    : []),
+  ...(selectedDocsReq.length
+    ? [``, `*Documents Required:*`, ...selectedDocsReq.map(d => `   📄 ${d}`)]
+    : []),
+];
+
+const text = [...header, ...vblocks, ...afterVehicles, ...footer].join("\n");
+
+      const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+
+      const w = window.open(url, "_blank", "noopener,noreferrer");
+      if (!w) window.location.href = url;
+
+    } catch (err) {
+      message.warning(err?.message || "Please fill all required fields before sending on WhatsApp.");
     }
-
-    // Pull values from state/form, with safe fallbacks
-    const showroomName = (brand === "SHANTHA" ? "Shantha Motors" : "NH Motors");
-    const name   = (form.getFieldValue("name") || "-").trim();
-    const comp   = (company || form.getFieldValue("company") || "-").trim();
-    const mdl    = (model   || form.getFieldValue("bikeModel") || "-").trim();
-    const varnt  = (variant || form.getFieldValue("variant")   || "-").trim();
-    const priceNum = form.getFieldValue("onRoadPrice") ?? onRoadPrice ?? 0;
-
-    // Executive contact
-    const execPhone = (EXECUTIVES.find(e => e.name === executiveName) || {}).phone || "-";
-
-    // Quotation date (IST)
-    const printDate = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-
-    // EMI helpers
-    const monthly = (typeof monthlyFor === "function") ? monthlyFor : () => 0;
-    const tenureList = Array.isArray(tenures) && tenures.length ? tenures : ["12","24","36","48"];
-
-    // Selected fittings (highlight only those the user ticked)
-    const selectedFittings = Array.isArray(fittings) ? fittings.filter(Boolean) : [];
-    const selectedDocsReq = Array.isArray(docsReq) ? docsReq.filter(Boolean) : [];
-
-    // ---------- Message copy (short, warm, impressive) ----------
-    const header = [
-      `*Hi ${name}, Welcome to ${showroomName}! 🚀*`,
-      `_Your personalized quotation is ready — clear, quick & tailored for you._`,
-      ``
-    ];
-
-    const bullets = [
-      `• *Quotation Date:* ${printDate}`,
-      `• *Vehicle:* ${comp} ${mdl} ${varnt}`,
-      `• *On-Road Price:* ${inr0(priceNum)}`
-    ];
-
-    if (mode === "loan") {
-      bullets.push(
-        `• *EMI Options (approx.):*`,
-        `   – Down Payment: ${inr0(downPayment || 0)}`,
-        ...tenureList.map((mo) => `   – ${mo} months: ${inr0(monthly(mo))}`)
-      );
-    }
-
-    // ✅ NEW: Highlight Free Extra Fittings the user selected
-    if (selectedFittings.length) {
-      bullets.push(
-        `• *Free Extra Fittings:*`,
-        ...selectedFittings.map(f => `   ✅ ${f}`)
-      );
-    }
-    // ✅ NEW: Highlight Free Extra Fittings the user selected
-    if (selectedDocsReq.length) {
-      bullets.push(
-        `• *Documents Required:*`,
-        ...selectedDocsReq.map(f => `   ✅ ${f}`)
-      );
-    }
-
-    // Contact + note
-    bullets.push(
-      `• *Sales Advisor:* ${executiveName || "-"} (${execPhone})`,
-      `• *Note:* Prices are indicative and may change without prior notice.`
-    );
-
-    const cta = [
-      ``,
-      `✨ *${showroomName} — Ride with Pride, Drive with Confidence.* ✨`
-    ];
-
-    const lines = [...header, ...bullets, ...cta];
-    const text = lines.join("\n");
-    const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
-
-    const w = window.open(url, "_blank", "noopener,noreferrer");
-    if (!w) window.location.href = url;
-
-  } catch {
-    message.warning("Please fill all required fields before sending on WhatsApp.");
-  }
-};
+  };
 
   const PrintList = ({ items }) => {
     if (!items?.length) return <span>-</span>;
     return <ul className="plist">{items.map((t) => <li key={t}>{t}</li>)}</ul>;
+  };
+
+  // ---------- Extra Vehicles UI Helpers ----------
+  const filteredModels = (comp) =>
+    [...new Set(bikeData.filter((r) => r.company === comp).map((r) => r.model))];
+
+  const filteredVariants = (comp, mdl) =>
+    [
+      ...new Set(
+        bikeData.filter((r) => r.company === comp && r.model === mdl).map((r) => r.variant)
+      ),
+    ];
+
+  const onExtraChange = (idx, patch) => {
+    setExtraVehicles((prev) => {
+      const next = [...prev];
+      const cur = { ...next[idx], ...patch };
+
+      // if sheet mode and variant changes -> auto price
+      if (!manual && patch.variant) {
+        const found = bikeData.find(
+          (r) => r.company === (cur.company || "") && r.model === (cur.model || "") && r.variant === patch.variant
+        );
+        if (found) {
+          cur.onRoadPrice = found.onRoadPrice || 0;
+          cur.downPayment = 0;
+        }
+      }
+
+      // if company/model changed, clear downstreams in sheet mode
+      if (!manual && patch.company) {
+        cur.model = "";
+        cur.variant = "";
+        cur.onRoadPrice = 0;
+        cur.downPayment = 0;
+      }
+      if (!manual && patch.model) {
+        cur.variant = "";
+        cur.onRoadPrice = 0;
+        cur.downPayment = 0;
+      }
+
+      next[idx] = cur;
+      return next;
+    });
+  };
+
+  const addVehicle = () => {
+    setExtraVehicles((prev) => {
+      if (prev.length >= 2) return prev;
+      return [...prev, makeEmptyVehicle()];
+    });
+  };
+
+  const removeVehicle = (idx) => {
+    setExtraVehicles((prev) => prev.filter((_, i) => i !== idx));
   };
 
   return (
@@ -711,7 +816,7 @@ const handleWhatsAppClick = async () => {
         @media print { .print-sheet { display: block; } .no-print { display: none !important; } }
       `}</style>
 
-  {/* On-screen inputs */}
+      {/* On-screen inputs */}
       <div className="wrap no-print">
         <div className="card">
           <Form
@@ -785,6 +890,11 @@ const handleWhatsAppClick = async () => {
                 <Form.Item label="Address" name="address" rules={[{ required: true, message: "Enter address" }]}>
                   <Input.TextArea rows={2} placeholder="House No, Street, Area, City, PIN" />
                 </Form.Item>
+              </Col>
+
+              {/* Vehicle 1 (existing main) */}
+              <Col span={24}>
+                <Divider orientation="left">Vehicle 1</Divider>
               </Col>
 
               {/* Vehicle selection */}
@@ -884,7 +994,7 @@ const handleWhatsAppClick = async () => {
                       {tenures.map((mo) => (
                         <div key={mo} className="emibox" style={{ minWidth: 140 }}>
                           <div style={{ fontWeight: 700 }}>{mo} months</div>
-                          <div style={{ fontWeight: 900, fontSize: 16 }}>{inr0(monthlyFor(mo))}</div>
+                          <div style={{ fontWeight: 900, fontSize: 16 }}>{inr0(monthlyFor(onRoadPrice, downPayment, mo))}</div>
                         </div>
                       ))}
                     </div>
@@ -892,7 +1002,7 @@ const handleWhatsAppClick = async () => {
                 </>
               )}
 
-              {/* Vehicle Type & Fittings */}
+              {/* GLOBAL Vehicle Type & Fittings (unchanged) */}
               <Col xs={24} md={12}>
                 <Form.Item label="Vehicle Type" name="vehicleType">
                   <Radio.Group
@@ -942,9 +1052,156 @@ const handleWhatsAppClick = async () => {
                 </Form.Item>
               </Col>
 
+              {/* Additional Vehicles */}
+              <Col span={24}>
+                <Divider orientation="left">Additional Vehicles</Divider>
+                {extraVehicles.map((ev, idx) => {
+                  const idx1 = idx + 2; // Vehicle 2/3
+                  const evModels = manual ? [] : filteredModels(ev.company);
+                  const evVariants = manual ? [] : filteredVariants(ev.company, ev.model);
+                  const tset = tenuresForSet(ev.emiSet || "12");
+
+                  return (
+                    <div key={idx} style={{ border: "1px dashed #d4d4d8", borderRadius: 8, padding: 12, marginBottom: 12 }}>
+                      <Row gutter={[12, 8]} align="middle">
+                        <Col span={24}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <strong>Vehicle {idx1}</strong>
+                            <Button
+                              danger
+                              type="text"
+                              icon={<DeleteOutlined />}
+                              onClick={() => removeVehicle(idx)}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        </Col>
+
+                        <Col xs={24} md={8}>
+                          {manual ? (
+                            <Input
+                              placeholder="Company"
+                              value={ev.company}
+                              onChange={(e) => onExtraChange(idx, { company: e.target.value })}
+                            />
+                          ) : (
+                            <Select
+                              placeholder="Select Company"
+                              value={ev.company || undefined}
+                              options={companies.map((c) => ({ value: c, label: c }))}
+                              onChange={(val) => onExtraChange(idx, { company: val })}
+                            />
+                          )}
+                        </Col>
+
+                        <Col xs={24} md={8}>
+                          {manual ? (
+                            <Input
+                              placeholder="Model"
+                              value={ev.model}
+                              onChange={(e) => onExtraChange(idx, { model: e.target.value })}
+                            />
+                          ) : (
+                            <Select
+                              placeholder="Select Model"
+                              disabled={!ev.company}
+                              value={ev.model || undefined}
+                              options={evModels.map((m) => ({ value: m, label: m }))}
+                              onChange={(val) => onExtraChange(idx, { model: val })}
+                            />
+                          )}
+                        </Col>
+
+                        <Col xs={24} md={8}>
+                          {manual ? (
+                            <Input
+                              placeholder="Variant"
+                              value={ev.variant}
+                              onChange={(e) => onExtraChange(idx, { variant: e.target.value })}
+                            />
+                          ) : (
+                            <Select
+                              placeholder="Select Variant"
+                              disabled={!ev.model}
+                              value={ev.variant || undefined}
+                              options={evVariants.map((v) => ({ value: v, label: v }))}
+                              onChange={(val) => onExtraChange(idx, { variant: val })}
+                            />
+                          )}
+                        </Col>
+
+                        <Col xs={24} md={12}>
+                          <InputNumber
+                            style={{ width: "100%" }}
+                            placeholder="On-Road Price (₹)"
+                            value={ev.onRoadPrice}
+                            readOnly={!manual}
+                            onChange={(val) => onExtraChange(idx, { onRoadPrice: Number(val || 0) })}
+                            formatter={(val) => `₹ ${String(val ?? "0").replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`}
+                            parser={(val) => String(val || "0").replace(/[₹,\s]/g, "")}
+                          />
+                        </Col>
+
+                        {mode === "loan" && (
+                          <>
+                            <Col xs={24} md={12}>
+                              <InputNumber
+                                style={{ width: "100%" }}
+                                placeholder="Down Payment (₹)"
+                                min={0}
+                                max={ev.onRoadPrice || 0}
+                                step={1000}
+                                value={ev.downPayment || 0}
+                                onChange={(val) => onExtraChange(idx, { downPayment: Math.min(Number(val || 0), ev.onRoadPrice || 0) })}
+                                formatter={(val) => `₹ ${String(val ?? "0").replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`}
+                                parser={(val) => String(val || "0").replace(/[₹,\s]/g, "")}
+                              />
+                            </Col>
+                            
+
+                            <Col xs={24}>
+                              <Radio.Group
+                                value={ev.emiSet || "12"}
+                                onChange={(e) => onExtraChange(idx, { emiSet: e.target.value })}
+                                style={{ marginBottom: 8 }}
+                              >
+                                <Radio value="12">12</Radio>
+                                <Radio value="48">48</Radio>
+                              </Radio.Group>
+                              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                                {tset.map((mo) => (
+                                  <div key={mo} className="emibox" style={{ minWidth: 140 }}>
+                                    <div style={{ fontWeight: 700 }}>{mo} months</div>
+                                    <div style={{ fontWeight: 900, fontSize: 16 }}>
+                                      {inr0(monthlyFor(ev.onRoadPrice || 0, ev.downPayment || 0, mo))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </Col>
+                          </>
+                        )}
+                      </Row>
+                    </div>
+                  );
+                })}
+
+                <Button
+                  icon={<PlusOutlined />}
+                  onClick={addVehicle}
+                  disabled={extraVehicles.length >= 2}
+                >
+                  Add Vehicle
+                </Button>
+                {extraVehicles.length >= 2 && (
+                  <span style={{ marginLeft: 8, color: "#666" }}>(Maximum 3 vehicles per quotation)</span>
+                )}
+              </Col>
+
               {/* Actions */}
               <Col span={24} style={{ textAlign: "right" }}>
-                 <Button
+                <Button
                   className="no-print"
                   onClick={handleSaveClick}
                   style={{ marginRight: 8 }}
@@ -952,7 +1209,7 @@ const handleWhatsAppClick = async () => {
                 >
                   Save
                 </Button>
-                {/* NEW: WhatsApp */}
+
                 <Button
                   className="no-print"
                   onClick={handleWhatsAppClick}
@@ -960,8 +1217,6 @@ const handleWhatsAppClick = async () => {
                 >
                   WhatsApp
                 </Button>
-
-               
 
                 <Button className="no-print" type="primary" icon={<PrinterOutlined />} onClick={handlePrint}>
                   Print
@@ -998,107 +1253,106 @@ const handleWhatsAppClick = async () => {
               </div>
             </div>
 
-            {/* Brand block */}
-            <div
-              style={{
-                borderBottom: "2px solid #000",
-                paddingBottom: 6,
-                marginBottom: 8,
-                display: "grid",
-                gridTemplateRows: "auto auto",
-                rowGap: 8,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "baseline",
-                  gap: 8,
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {brand === "SHANTHA" ? (
-                  <>
-                    <div className="title-kn" style={{ whiteSpace: "nowrap" }}>
-                      ಶಾಂತ ಮೋಟರ್ಸ್
-                    </div>
-                    <div className="title-en" style={{ whiteSpace: "nowrap" }}>
-                      Shantha Motors
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="title-knhonda" style={{ whiteSpace: "nowrap" }}>
-                      ಎನ್ ಎಚ್ ಮೋಟರ್ಸ್
-                    </div>
-                    <div className="title-en" style={{ whiteSpace: "nowrap" }}>
-                      NH Motors
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <div
-                className="brand-row2"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr auto",
-                  columnGap: 16,
-                  alignItems: "start",
-                }}
-              >
-                <div>
-                  {brand === "SHANTHA" ? (
-                    <>
-                      <div>
-                        <div className="addr-line">• Kadabagere,Beside State Bank India,Magadi Main Road, Bangalore - 562130</div>
-                        <div className="addr-line">• No.195, Oppsit.to Muddanna Ceramics, Ullal Main Road, Bangalore - 560091</div>
-                        <div className="addr-line">• Oppsit. Lens Cart, D - Group Layout, Gidadakonenahalli, Bangalore - 560091</div>
-                        <div className="addr-line">• No.1, Opp to Udupi Garden Hotel,Andrahalli Main Road, Bangalore - 560091</div>
-                        <div className="addr-line">• Tavarekere, Besides Poorvika Elect., Magadi Main Road, Bangalore - 562130</div>
-                        <div className="addr-line">• Hegganahalli,Anjaneya Temple,Hegganahali Main Road, Bangalore - 560091</div>
-                        <div className="addr-line">• No.34/1,Opp.Sarita Bar,Channenahali,Magdi Main Road, Bangalore - 562130</div>
-                        <div className="addr-line">• No.14,Nelagadrahalli Main Road,Nr St Joseph's College, Bangalore - 560073</div>
-                      </div>
-                      <div style={{ marginTop: 6, fontWeight: 600 }}>
-                        Mob: 9731366921 / 8073283502 / 9035131806
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="addr-linehonda">
-                        Site No. 116/1, Bydarahalli, Magadi Main Road, Opp. HP Petrol Bunk, Bangalore - 560091
-                      </div>
-                      <div style={{ marginTop: 6, fontWeight: 600 }}>
-                        Mob: 9731366921 / 8073283502 / 9741609799
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                <div
-                  className="brand-right"
-                  style={{
-                    display: "flex",
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 16,
-                    justifyContent: "flex-end",
-                  }}
-                >
-                  <img
-                    src={brand === "SHANTHA" ? "/shantha-logoprint.png" : "/honda-logo.png"}
-                    alt="Brand Logo"
-                    style={{
-                      height: brand === "SHANTHA" ? 160 : 120,
-                      objectFit: "contain",
-                    }}
-                  />
-                </div>
-              </div>
+           {/* Brand block */}
+<div
+  style={{
+    borderBottom: "2px solid #000",
+    paddingBottom: 6,
+    marginBottom: 8,
+  }}
+>
+  <div
+    className="brand-row2"
+    style={{
+      display: "grid",
+      gridTemplateColumns: "1fr auto",
+      columnGap: 16,
+      alignItems: "center",
+    }}
+  >
+    {/* LEFT: brand names + addresses + mobiles */}
+    <div>
+      {/* Brand names horizontally (smaller than before) */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          gap: 10,
+          flexWrap: "wrap",
+          marginBottom: 4,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
+        {brand === "SHANTHA" ? (
+          <>
+            <div className="title-kn" style={{ fontSize: "25pt", fontWeight: 800 }}>
+              ಶಾಂತ ಮೋಟರ್ಸ್
             </div>
+            <div className="title-en" style={{ fontSize: "20pt", fontWeight: 800 }}>
+              Shantha Motors
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="title-knhonda" style={{ fontSize: "25pt", fontWeight: 800 }}>
+              ಎನ್ ಎಚ್ ಮೋಟರ್ಸ್
+            </div>
+            <div className="title-en" style={{ fontSize: "18pt", fontWeight: 700 }}>
+              NH Motors
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Addresses + mobile (condensed lines as requested) */}
+      {brand === "SHANTHA" ? (
+        <>
+          <div className="addr-line" style={{ fontSize: "13pt" }}>
+            • D-Group Layout • Hegganahalli  • Channenahali • Nelagadrahalli
+          </div>
+          <div className="addr-line" style={{ fontSize: "13pt" }}>
+            • Kadabagere  • Muddinapalya  • Andrahalli  • Tavarekere
+          </div>
+          <div style={{ marginTop: 6, fontWeight: 600 }}>
+            Mob: 9731366921 / 8073283502 / 9035131806
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="addr-linehonda" style={{ fontSize: "12pt" }}>
+            Site No. 116/1, Bydarahalli, Magadi Main Road, Opp. HP Petrol Bunk, Bangalore - 560091
+          </div>
+          <div style={{ marginTop: 6, fontWeight: 600 }}>
+            Mob: 9731366921 / 8073283502 / 9741609799
+          </div>
+        </>
+      )}
+    </div>
+
+    {/* RIGHT: logo only */}
+    <div
+      className="brand-right"
+      style={{
+        display: "flex",
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 16,
+        justifyContent: "flex-end",
+      }}
+    >
+      <img
+        src={brand === "SHANTHA" ? "/shantha-logoprint.png" : "/honda-logo.png"}
+        alt="Brand Logo"
+        style={{
+          height: 130, // 80–100px requested; using 100 for clarity
+          objectFit: "contain",
+        }}
+      />
+    </div>
+  </div>
+</div>
 
             {/* Customer */}
             <div className="box" style={{ marginBottom: 8 }}>
@@ -1110,9 +1364,9 @@ const handleWhatsAppClick = async () => {
               </div>
             </div>
 
-            {/* Vehicle */}
+            {/* Vehicle 1 */}
             <div className="box" style={{ marginBottom: 8 }}>
-              <div className="section-title">Vehicle Details</div>
+              <div className="section-title">Vehicle 1 Details</div>
               <div className="row3" style={{ fontSize: "12pt" }}>
                 <div><b>Company:</b> {company || form.getFieldValue("company") || "-"}</div>
                 <div><b>Model:</b> {model || form.getFieldValue("bikeModel") || "-"}</div>
@@ -1126,10 +1380,10 @@ const handleWhatsAppClick = async () => {
               </div>
             </div>
 
-            {/* EMI */}
+            {/* EMI for Vehicle 1 */}
             {mode === "loan" && (
               <div className="box" style={{ marginBottom: 8 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 12, alignItems: "start" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "0.5fr 2fr", gap: 12, alignItems: "start" }}>
                   <div>
                     <div style={{ fontWeight: 700, marginBottom: 4, fontSize: "12pt" }}>Down Payment</div>
                     <div style={{ fontWeight: 800, fontSize: "18pt" }}>{inr0(downPayment || 0)}</div>
@@ -1141,7 +1395,7 @@ const handleWhatsAppClick = async () => {
                       {tenures.map((mo) => (
                         <div key={mo} className="emibox" style={{ flex: 1, minWidth: 120 }}>
                           <div style={{ fontWeight: 700 }}>{mo} months</div>
-                          <div style={{ fontWeight: 900 }}>{inr0(monthlyFor(mo))}</div>
+                          <div style={{ fontWeight: 900 }}>{inr0(monthlyFor(onRoadPrice, downPayment, mo))}</div>
                         </div>
                       ))}
                     </div>
@@ -1150,7 +1404,55 @@ const handleWhatsAppClick = async () => {
               </div>
             )}
 
-            {/* Executive + fittings + docs */}
+           
+            {/* Extra Vehicles blocks on print */}
+            {extraVehicles.map((ev, idx) => {
+              const idx1 = idx + 2;
+              const tset = tenuresForSet(ev.emiSet || "12");
+              return (
+                <div key={idx}>
+                  <div className="box" style={{ marginBottom: 8 }}>
+                    <div className="section-title">Vehicle {idx1} Details</div>
+                    <div className="row3" style={{ fontSize: "12pt" }}>
+                      <div><b>Company:</b> {ev.company || "-"}</div>
+                      <div><b>Model:</b> {ev.model || "-"}</div>
+                      <div><b>Variant:</b> {ev.variant || "-"}</div>
+                    </div>
+                    <div style={{ marginTop: 6, textAlign: "center" }}>
+                      <span className="big-price">
+                        <span><b>On-Road Price:</b> </span>
+                        {inr0(ev.onRoadPrice || 0)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {mode === "loan" && (
+                    <div className="box" style={{ marginBottom: 8 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "0.5fr 2fr", gap: 12, alignItems: "start" }}>
+                        <div>
+                          <div style={{ fontWeight: 700, marginBottom: 4, fontSize: "12pt" }}>Down Payment</div>
+                          <div style={{ fontWeight: 800, fontSize: "18pt" }}>{inr0(ev.downPayment || 0)}</div>
+                        </div>
+
+                        <div>
+                          <div style={{ fontWeight: 900, textAlign: "center", marginBottom: 4, fontSize: "14pt" }}>EMI DETAILS</div>
+                          <div style={{ display: "flex", gap: 8, justifyContent: "space-between", flexWrap: "wrap" }}>
+                            {tset.map((mo) => (
+                              <div key={mo} className="emibox" style={{ flex: 1, minWidth: 120 }}>
+                                <div style={{ fontWeight: 700 }}>{mo} months</div>
+                                <div style={{ fontWeight: 900 }}>{inr0(monthlyFor(ev.onRoadPrice || 0, ev.downPayment || 0, mo))}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+             {/* Executive + fittings + docs */}
             <div className="box" style={{ marginBottom: 8 }}>
               <div style={{ marginBottom: 6, fontSize: "13pt", fontWeight: 700 }}>
                 <b>Executive name:</b> {executiveName || "-"}
@@ -1195,6 +1497,7 @@ const handleWhatsAppClick = async () => {
                 </div>
               </div>
             </div>
+
 
             <div style={{ fontSize: "9.5pt", display: "flex", justifyContent: "space-between" }}>
               <div />
