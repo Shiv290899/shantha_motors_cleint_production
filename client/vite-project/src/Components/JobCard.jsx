@@ -38,7 +38,7 @@ const GFORM_ENTRY = {
 
 // Branches
 const BRANCHES = [
-  "byadarahalli",
+  "Byadarahalli",
   "Kadabagere",
   "Muddinapalya",
   "D-Group Layout",
