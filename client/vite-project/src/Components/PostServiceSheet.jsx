@@ -55,8 +55,9 @@ img { max-width: 100%; height: auto; background: transparent; }
   .no-print { display: none !important; }
 }
 
-/* Screen preview: keep this sheet hidden unless you explicitly show it */
+/* Hide on screen only inside the main app, not in the special print window */
 @media screen {
+  body:not(.print-host) 
   .print-sheet { display: none !important; }
 }
 
