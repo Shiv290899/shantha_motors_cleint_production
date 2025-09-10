@@ -105,8 +105,6 @@ export default function Navbar() {
     { label: "Contact", path: "/contact" },
     { label: "Login", path: "/login" },
     { label: "About Us", path: "/about-us" },
-    { label: "About Us", path: "/about-us" },
-   
   ];
 
   return (
