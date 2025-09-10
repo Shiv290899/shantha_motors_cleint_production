@@ -366,7 +366,7 @@ export default function Quotation() {
     const total = principal + totalInterest;
     return months > 0 ? total / months : 0;
   };
-  const tenuresForSet = (s) => (s === "12" ? [12, 18, 24, 30] : [24, 30, 36, 48]);
+  const tenuresForSet = (s) => (s === "12" ? [12, 18, 24, 36] : [24, 30, 36, 48]);
 
   // ---------- Android-proof A4 print ----------
   const handlePrint = async () => {
