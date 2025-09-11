@@ -38,7 +38,7 @@ const GFORM_ENTRY = {
 
 // Branches
 const BRANCHES = [
-  "Byadarahalli",
+  "byadarahalli",
   "Kadabagere",
   "Muddinapalya",
   "D-Group Layout",
@@ -252,13 +252,13 @@ function buildWelcomeMsg(vals, totals) {
 
   return (
     `Hi ${name}!\n` +
-    `✅ Your service is booked at Shantha Motors.\n\n` +
-    `Welcome to *Shantha Motors*,\n` +
-    `ಶಾಂತ ಮೋಟರ್ಸ್‌ಗೆ ಸ್ವಾಗತ.\n\n` +
-    `🧾 Job Card No: ${jc}\n` + `🏍️ ${reg}\n` +
+    `✅ Your service is booked at Shantha Motors.\n` +
+    `Welcome to Shantha Motors,\n` +
+    `ಶಾಂತಾ ಮೋಟರ್ಸ್‌ಗೆ ಸ್ವಾಗತ.\n\n` +
+    `🧾 JC: ${jc} | 🚘 ${reg}\n` +
     `📅 Delivery: ${fmtDate}\n` +
-    `💰 ಅಂದಾಜು ವೆಚ್ಚ / Estimated Amount: ${estimate}\n\n` +
-    `ಯಾವುದೇ ಸಹಾಯ ಬೇಕಾದರೆ ಇಲ್ಲಿ ಸಂಪರ್ಕಿಸಿ.\n` +
+    `💰 ಅಂದಾಜು ವೆಚ್ಚ / Estimate: ${estimate}\n\n` +
+    `ಯಾವುದೇ ಸಹಾಯ ಬೇಕಾದರೆ ಇಲ್ಲಿ ಉತ್ತರಿಸಿ.\n` +
     `— ${vals?.executive || "Team"}, ${branch}${execPhone ? ` (☎️ ${execPhone})` : ""}`
   );
 }
@@ -361,6 +361,10 @@ export default function JobCard() {
   };
 
   // Watchers for totals
+
+const obsNotes = Form.useWatch("obs", form);
+
+  const floorMat = Form.useWatch("floorMat", form);
   const labourRows = Form.useWatch("labourRows", form) || [];
   const gstLabour = Form.useWatch("gstLabour", form) ?? DEFAULT_GST_LABOUR;
   const discounts = Form.useWatch("discounts", form) || { labour: 0 };
@@ -413,13 +417,13 @@ const handleServiceCheckbox = (checkedValues) => {
   if (next) {
     const defaultVehicle = "Motorcycle";
     setVehicleTypeLocal(defaultVehicle);
-    form.setFieldsValue({
-      vehicleType: defaultVehicle,
-      floorMat: undefined,
-      labourRows: buildRows(next, defaultVehicle),
-      gstLabour: DEFAULT_GST_LABOUR,
-      discounts: { labour: 0 },
-    });
+     form.setFieldsValue({
+   vehicleType: defaultVehicle,
+   // keep existing floorMat; user can toggle after this
+   labourRows: buildRows(next, defaultVehicle),
+   gstLabour: DEFAULT_GST_LABOUR,
+   discounts: { labour: 0 },
+ });
     message.success(`Applied preset: ${next} / ${defaultVehicle}`);
   } else {
     form.setFieldsValue({ labourRows: [] });
@@ -428,21 +432,21 @@ const handleServiceCheckbox = (checkedValues) => {
 
   const serviceValueForUI = serviceTypeLocal ? [serviceTypeLocal] : [];
 
-  // If vehicle is not Scooter, clear Floor Mat
-  useEffect(() => {
-    if (vehicleTypeLocal !== "Scooter") {
-      form.setFieldsValue({ floorMat: undefined });
-    }
-  }, [vehicleTypeLocal, form]);
+ // Keep the value; we simply hide the control on non-Scooter in the UI.
+ useEffect(() => {
+   // no-op: do not clear floorMat here
+ }, [vehicleTypeLocal, form]);
 
    // ✅ PRINT handling with safe pipeline
-  const handlePrint = async (which) => {
-    if (which === "pre") {
-      await handleSmartPrint(preRef.current);
-    } else if (which === "post") {
-      await handleSmartPrint(postRef.current);
-    }
-  };
+   const handlePrint = async (which) => {
+   // Ensure latest Segmented value (Yes/No) is committed to vals
+   await new Promise(requestAnimationFrame);
+   if (which === "pre") {
+     await handleSmartPrint(preRef.current);
+   } else if (which === "post") {
+     await handleSmartPrint(postRef.current);
+   }
+ };
 
 
   // SAVE handling → open Google Form with prefilled values (user-visible)
@@ -472,7 +476,12 @@ const handleServiceCheckbox = (checkedValues) => {
         "branch",
         "mechanic",
       ]);
-      const vals = form.getFieldsValue(true);
+       //const valsRaw = form.getFieldsValue(true);
+        //const vals = { ...valsRaw, floorMat: floorMatWatch };
+
+        const valsRaw = form.getFieldsValue(true);
+const vals = { ...valsRaw, floorMat, obs: obsNotes };
+
       const amt = Number.isFinite(totals.grand) ? Math.round(totals.grand) : 0;
 
       // Map app values to Google entry fields
@@ -716,6 +725,11 @@ const handleShareWhatsApp = async () => {
                   <Input placeholder="Connected / Not reachable / Will call back" />
                 </Form.Item>
               </Col>
+              <Col xs={24}>
+                <Form.Item label="Customer Observation (additional notes)" name="obs">
+                  <Input.TextArea rows={3} placeholder="Write the customer's observations..." />
+                </Form.Item>
+              </Col>
             </Row>
           </Card>
 
@@ -773,7 +787,7 @@ const handleShareWhatsApp = async () => {
                     <Segmented
                       className="blue-segmented"
                       block
-                      options={["Yes", "No"]}
+                      options={["No", "Yes"]}
                       onChange={(val) => form.setFieldsValue({ floorMat: val })}
                     />
                   </Form.Item>
@@ -786,11 +800,7 @@ const handleShareWhatsApp = async () => {
                 </Form.Item>
               </Col>
 
-              <Col xs={24}>
-                <Form.Item label="Customer Observation (additional notes)" name="obs">
-                  <Input.TextArea rows={3} placeholder="Write the customer's observations..." />
-                </Form.Item>
-              </Col>
+              
             </Row>
           </Card>
 
