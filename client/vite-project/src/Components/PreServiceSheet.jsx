@@ -217,13 +217,15 @@ img { max-width: 100%; height: auto; background: transparent; }
 
 /* Printable empty checkbox square */
 .cb {
-  display: inline-block;
-  width: 4mm;
-  height: 4mm;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 5mm;
+  height: 5mm;
   border: 1px solid #111;
-  margin-left: 1.5mm;
-  vertical-align: middle;
+  font-size: 12px;  /* ensures ☑ / ☐ fits */
 }
+
 
 /* NOTE block below the list */
 .note-box { border-top: 1px dashed #777; margin-top: 3mm; padding-top: 2mm; }
@@ -353,8 +355,9 @@ img { max-width: 100%; height: auto; background: transparent; }
                     <li>
                       Floor Mat
                       <span className="yn">
-                        Yes <span className="cb">{tick(floorMatYes)}</span>
-                        No <span className="cb">{tick(floorMatNo)}</span>
+                      Yes <span className="cb">{tick(floorMatYes)}</span>
+                      No  <span className="cb">{tick(floorMatNo)}</span>
+
                       </span>
                     </li>
                   </ul>
