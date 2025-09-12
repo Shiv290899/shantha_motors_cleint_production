@@ -853,19 +853,7 @@ const text = [...header, ...vblocks, ...afterVehicles, ...footer].join("\n");
       {/* On-screen inputs */}
       <div className="wrap no-print">
         <div className="card">
-          <Form
-            layout="vertical"
-            form={form}
-            initialValues={{ executive: EXECUTIVES[0].name }}
-          >
-            <Row gutter={[12, 8]}>
-
-              <Col span={24}>
-                <Form.Item label="Brand on Print">
-                  <Radio.Group value={brand} onChange={(e)=>setBrand(e.target.value)}>
-                    <Radio value="SHANTHA">Shantha Motors</Radio>
-                    <Radio value="NH">NH Motors (Honda)</Radio>
-                  </Radio.Group>
+             <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end"  }}>
                    <ViewSheet
   sheetCsvUrl={RESPONSES_CSV_URL}   // or SHEET_CSV_URL if you want the vehicle data
   parseCSV={parseCsvForView}
@@ -873,10 +861,23 @@ const text = [...header, ...vblocks, ...afterVehicles, ...footer].join("\n");
   buttonProps={{ type: "primary" }}
   buttonText="View Sheet"
 />
-
-                </Form.Item>
-
+</div>
+          <Form
+            layout="vertical"
+            form={form}
+            initialValues={{ executive: EXECUTIVES[0].name }}
+          >
+            <Row gutter={[12, 8]}>
                 
+
+              <Col span={24}>
+        
+                <Form.Item label="Brand on Print">
+                  <Radio.Group value={brand} onChange={(e)=>setBrand(e.target.value)}>
+                    <Radio value="SHANTHA">Shantha Motors</Radio>
+                    <Radio value="NH">NH Motors (Honda)</Radio>
+                  </Radio.Group>
+                </Form.Item>
               </Col>
 
               <Col span={24}>
