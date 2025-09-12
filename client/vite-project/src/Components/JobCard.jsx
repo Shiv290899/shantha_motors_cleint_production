@@ -10,6 +10,7 @@ import { FaWhatsapp } from "react-icons/fa";
 import PreServiceSheet from "./PreServiceSheet";
 import PostServiceSheet from "./PostServiceSheet";
 import FetchJobcard from "./FetchJobcard";
+import ViewSheet from "./ViewSheet";
 
 
 const { Title, Text } = Typography;
@@ -537,6 +538,12 @@ const OBS_SEP = " # ";
       setVehicleTypeLocal={setVehicleTypeLocal}
       setRegDisplay={setRegDisplay}
     />
+    <ViewSheet
+   sheetCsvUrl={SHEET_CSV_URL}
+   parseCSV={parseCSV}
+   buttonProps={{ type: "primary" }}
+   buttonText="View Sheet"
+ />
   </div>
 </Card>
 
