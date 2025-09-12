@@ -5,10 +5,12 @@ import {
   InputNumber, Row, Typography, message, Select, Button, Segmented, Checkbox
 } from "antd";
 import dayjs from "dayjs";
-import { handleSmartPrint } from "../utils/printUtils"; 
+import { handleSmartPrint } from "../utils/printUtils";
 import { FaWhatsapp } from "react-icons/fa";
 import PreServiceSheet from "./PreServiceSheet";
 import PostServiceSheet from "./PostServiceSheet";
+import FetchJobcard from "./FetchJobcard";
+
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -28,17 +30,30 @@ const GFORM_BASE =
 const GFORM_POST =
   "https://docs.google.com/forms/d/e/1FAIpQLScGtIO_uWXq30BUSP3Pgs1EQFiXTBcLLiTP69rAHcv4QPm8hA/formResponse";
 
+/** Field IDs from your Google Form */
 const GFORM_ENTRY = {
-  name: "entry.1964588497",
-  mobile: "entry.108507469",
-  branch: "entry.2030797816",
-  mechanic: "entry.122292818",
-  amount: "entry.1599026863", // collected amount (Grand Total)
+  branch:              "entry.938233061",   // Branch
+  mechanic:            "entry.1097953553",  // Alloted Mechanic
+  executive:           "entry.1288132288",  // Executive
+  expectedDelivery:    "entry.1007370274",  // Expected Delivery Date
+  regNo:               "entry.2009060932",  // Vehicle No
+  model:               "entry.1335559098",  // Model
+  colour:              "entry.228634082",   // Color
+  km:                  "entry.488338565",   // Odometer Reading
+  custName:            "entry.1964588497",  // Customer Name
+  custMobile:          "entry.108507469",   // Mobile No
+  obs:                 "entry.772489632",   // Customer Observation
+  vehicleType:         "entry.449121220",   // Vehicle Type
+  serviceType:         "entry.1570612104",  // ✅ Service Type
+  floorMat:            "entry.1163886348",  // Floor Mat
+  amount:              "entry.1599026863",  // Collected Amount
+  jcNo:                "entry.262964623",   // JC No.
 };
+
 
 // Branches
 const BRANCHES = [
-  "byadarahalli",
+  "Byadarahalli",
   "Kadabagere",
   "Muddinapalya",
   "D-Group Layout",
@@ -46,26 +61,26 @@ const BRANCHES = [
   "Tavarekere",
   "Hegganahalli",
   "Channenahalli",
-  "Nelagadrahalli"
+  "Nelagadrahalli",
 ];
 
 const EXECUTIVES = [
-  { name: "Rukmini", phone: "9901678562" },
-  { name: "Meghana", phone: "7019974219" },
-  { name: "Shubha", phone: "8971585057" },
-  { name: "Rani", phone: "8971585057" },
-  { name: "Nikitha", phone: "9535190015" },
-  { name: "Prakash", phone: "9740176476" },
-  { name: "Kumar", phone: "7975807667" },
-  { name: "Sujay", phone: "7022878048" },
-  { name: "Kavi", phone: "9108970455" },
-  { name: "Narasimha", phone: "9900887666" },
-  { name: "Kavya", phone: "8073165374" },
-  { name: "Vanitha", phone: "9380729861" },
+  { name: "Rukmini",  phone: "9901678562" },
+  { name: "Meghana",  phone: "7019974219" },
+  { name: "Shubha",   phone: "8971585057" },
+  { name: "Rani",     phone: "8971585057" },
+  { name: "Nikitha",  phone: "9535190015" },
+  { name: "Prakash",  phone: "9740176476" },
+  { name: "Kumar",    phone: "7975807667" },
+  { name: "Sujay",    phone: "7022878048" },
+  { name: "Kavi",     phone: "9108970455" },
+  { name: "Narasimha",phone: "9900887666" },
+  { name: "Kavya",    phone: "8073165374" },
+  { name: "Vanitha",  phone: "9380729861" },
 ];
 
-const SERVICE_TYPES = ["Free", "Paid"]; // shown as checkboxes (single-select enforced)
-const VEHICLE_TYPES = ["Motorcycle","Scooter"]; // tabs
+const SERVICE_TYPES = ["Free", "Paid"]; // checkbox UI (single-select enforced)
+const VEHICLE_TYPES = ["Motorcycle", "Scooter"]; // tabs
 const MECHANIC = ["Sonu", "ManMohan", "Mansur", "Irshad", "Dakshat"];
 
 // Fuel Level (tabs)
@@ -162,21 +177,6 @@ const inr = (n) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 })
     .format(Math.max(0, Math.round(Number(n || 0))));
 
-// // Build prefill URL for Google Form using current form values
-// function buildPrefillUrl(vals, grandTotal) {
-//   const params = new URLSearchParams();
-
-//   if (vals?.custName)   params.set(GFORM_ENTRY.name, vals.custName);
-//   if (vals?.custMobile) params.set(GFORM_ENTRY.mobile, String(vals.custMobile));
-//   if (vals?.branch)     params.set(GFORM_ENTRY.branch, vals.branch);
-//   if (vals?.mechanic)   params.set(GFORM_ENTRY.mechanic, vals.mechanic);
-
-//   const amt = Number.isFinite(grandTotal) ? Math.round(grandTotal) : 0;
-//   params.set(GFORM_ENTRY.amount, String(amt));  // send Grand Total
-
-//   return `${GFORM_BASE}&${params.toString()}`;
-// }
-
 /** Silently POST to Google Form via hidden form + iframe (bypasses CORS) */
 function autoSubmitToGoogle(entries) {
   const iframe = document.createElement("iframe");
@@ -197,7 +197,7 @@ function autoSubmitToGoogle(entries) {
     form.appendChild(input);
   });
 
-  // Optional Google params (usually not required, but harmless)
+  // Optional Google params
   const pageHistory = document.createElement("input");
   pageHistory.type = "hidden";
   pageHistory.name = "pageHistory";
@@ -208,15 +208,13 @@ function autoSubmitToGoogle(entries) {
   document.body.appendChild(form);
   form.submit();
 
-  // Clean up after a moment
+  // Clean up
   setTimeout(() => {
     try { document.body.removeChild(form); } catch {
-      //
+      //igor
     }
     try { document.body.removeChild(iframe); } catch {
-
-    //ignore
-
+      //oghnor
     }
   }, 2000);
 }
@@ -225,13 +223,11 @@ function autoSubmitToGoogle(entries) {
    WHATSAPP / SMS HELPERS
    ========================= */
 
-/** Get executive phone from your EXECUTIVES array by name */
 function getExecPhone(executives, execName) {
   const found = executives.find((e) => e.name === execName);
   return found?.phone || "";
 }
 
-/** Sanitizes a 10-digit Indian mobile number and returns "91<digits>" or "" */
 function normalizeINPhone(raw) {
   const digits = String(raw || "").replace(/\D/g, "");
   if (digits.length === 10) return `91${digits}`;
@@ -239,7 +235,6 @@ function normalizeINPhone(raw) {
   return "";
 }
 
-/** Builds the exact bilingual message text */
 function buildWelcomeMsg(vals, totals) {
   const fmtDate =
     vals?.expectedDelivery ? dayjs(vals.expectedDelivery).format("DD/MM/YYYY") : "—";
@@ -263,38 +258,26 @@ function buildWelcomeMsg(vals, totals) {
   );
 }
 
-/**
- * Try opening WhatsApp. If it doesn't open (blocked / not installed),
- * fall back to SMS composer gracefully.
- */
 function openWhatsAppOrSMS({ mobileE164, text, onFailToWhatsApp }) {
   const waUrl = `https://wa.me/${mobileE164}?text=${encodeURIComponent(text)}`;
-
-  // Open WhatsApp in a new tab/window first (best for iPhone Safari)
   const w = window.open(waUrl, "_blank", "noopener,noreferrer");
 
-  // If the popup was blocked, we immediately fall back to SMS.
   const blocked = !w || w.closed || typeof w.closed === "undefined";
   if (blocked) {
     onFailToWhatsApp?.();
-    // iOS uses &body= ; most Android clients also accept ?body=
     const smsUrl = `sms:+${mobileE164}?body=${encodeURIComponent(text)}`;
     window.location.href = smsUrl;
     return;
   }
 
-  // If opened, add a short timer—if user closes quickly or WA not installed,
-  // we still offer SMS after ~1s (best-effort).
   setTimeout(() => {
     try {
-      if (w.closed) return; // user is in WhatsApp/kept tab open → good
-      // If still open after a second, assume WA didn’t take over → offer SMS.
+      if (w.closed) return;
       onFailToWhatsApp?.();
       w.close();
       const smsUrl = `sms:+${mobileE164}?body=${encodeURIComponent(text)}`;
       window.location.href = smsUrl;
     } catch {
-      // Ignore cross-origin checks and still try SMS
       onFailToWhatsApp?.();
       const smsUrl = `sms:+${mobileE164}?body=${encodeURIComponent(text)}`;
       window.location.href = smsUrl;
@@ -311,9 +294,8 @@ export default function JobCard() {
   const screens = useBreakpoint();
 
   const [regDisplay, setRegDisplay] = useState("");
-  const [serviceTypeLocal, setServiceTypeLocal] = useState(null); // single selection from checkboxes
-  const [vehicleTypeLocal, setVehicleTypeLocal] = useState(null); // Segmented tabs
- // ✅ refs for safe printing
+  const [serviceTypeLocal, setServiceTypeLocal] = useState(null);
+  const [vehicleTypeLocal, setVehicleTypeLocal] = useState(null);
   const preRef = useRef(null);
   const postRef = useRef(null);
 
@@ -353,40 +335,28 @@ export default function JobCard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Handle masked registration input
   const handleRegChange = (e) => {
     const next = formatReg(e.target.value);
     setRegDisplay(next);
     form.setFieldsValue({ regNo: next });
   };
 
-  // Watchers for totals
-
-const obsNotes = Form.useWatch("obs", form);
-
-  const floorMat = Form.useWatch("floorMat", form);
   const labourRows = Form.useWatch("labourRows", form) || [];
   const gstLabour = Form.useWatch("gstLabour", form) ?? DEFAULT_GST_LABOUR;
   const discounts = Form.useWatch("discounts", form) || { labour: 0 };
 
-  // Totals
-// ✅ fixed
-const totals = useMemo(() => {
-  const labourSub = labourRows.reduce(
-    (sum, r) => sum + Number(r?.qty || 0) * Number(r?.rate || 0),
-    0
-  );
-  const labourGST = labourSub * (Number(gstLabour) / 100);
-  const labourDisc = Number(discounts.labour || 0);
-  const grand = Math.max(0, labourSub + labourGST - labourDisc);
-  return { labourSub, labourGST, labourDisc, grand };
-}, [labourRows, gstLabour, discounts]);
+  const totals = useMemo(() => {
+    const labourSub = labourRows.reduce(
+      (sum, r) => sum + Number(r?.qty || 0) * Number(r?.rate || 0),
+      0
+    );
+    const labourGST = labourSub * (Number(gstLabour) / 100);
+    const labourDisc = Number(discounts.labour || 0);
+    const grand = Math.max(0, labourSub + labourGST - labourDisc);
+    return { labourSub, labourGST, labourDisc, grand };
+  }, [labourRows, gstLabour, discounts]);
 
-
-  // KM input: only digits, max 6
   const handleKmKeyPress = (e) => { if (!/[0-9]/.test(e.key)) e.preventDefault(); };
-
-  // Mobile input: only digits, exactly 10
   const handleMobileKeyPress = (e) => { if (!/[0-9]/.test(e.key)) e.preventDefault(); };
   const handleMobileChange = (e) => {
     const val = e.target.value;
@@ -395,108 +365,107 @@ const totals = useMemo(() => {
     form.setFieldsValue({ custMobile: val });
   };
 
-  // Service Type UI: checkboxes but single-select enforced
   const serviceOptions = SERVICE_TYPES.map((t) => ({ label: t, value: t }));
 
-  // replace your existing handleServiceCheckbox with this:
-const handleServiceCheckbox = (checkedValues) => {
-  let next = null;
+  const handleServiceCheckbox = (checkedValues) => {
+    let next = null;
+    if (checkedValues.length === 0) next = null;
+    else if (checkedValues.length === 1) next = checkedValues[0];
+    else next = checkedValues.find((v) => v !== serviceTypeLocal) || checkedValues[0];
 
-  if (checkedValues.length === 0) {
-    next = null;
-  } else if (checkedValues.length === 1) {
-    next = checkedValues[0];
-  } else {
-    // two selected temporarily; pick the one that wasn't previously selected
-    next = checkedValues.find(v => v !== serviceTypeLocal) || checkedValues[0];
-  }
+    setServiceTypeLocal(next || null);
+    form.setFieldsValue({ serviceType: next || undefined });
 
-  setServiceTypeLocal(next || null);
-  form.setFieldsValue({ serviceType: next || undefined });
+    if (next) {
+      const defaultVehicle = "Motorcycle";
+      setVehicleTypeLocal(defaultVehicle);
+      form.setFieldsValue({
+        vehicleType: defaultVehicle,
+        labourRows: buildRows(next, defaultVehicle),
+        gstLabour: DEFAULT_GST_LABOUR,
+        discounts: { labour: 0 },
+      });
+      message.success(`Applied preset: ${next} / ${defaultVehicle}`);
+    } else {
+      form.setFieldsValue({ labourRows: [] });
+    }
+  };
 
-  if (next) {
-    const defaultVehicle = "Motorcycle";
-    setVehicleTypeLocal(defaultVehicle);
-     form.setFieldsValue({
-   vehicleType: defaultVehicle,
-   // keep existing floorMat; user can toggle after this
-   labourRows: buildRows(next, defaultVehicle),
-   gstLabour: DEFAULT_GST_LABOUR,
-   discounts: { labour: 0 },
- });
-    message.success(`Applied preset: ${next} / ${defaultVehicle}`);
-  } else {
-    form.setFieldsValue({ labourRows: [] });
-  }
-};
+  useEffect(() => {
+    // keep floorMat value; only hide UI for non-scooter
+  }, [vehicleTypeLocal, form]);
 
-  const serviceValueForUI = serviceTypeLocal ? [serviceTypeLocal] : [];
+  const handlePrint = async (which) => {
+    await new Promise(requestAnimationFrame);
+    if (which === "pre") {
+      await handleSmartPrint(preRef.current);
+    } else if (which === "post") {
+      await handleSmartPrint(postRef.current);
+    }
+  };
 
- // Keep the value; we simply hide the control on non-Scooter in the UI.
- useEffect(() => {
-   // no-op: do not clear floorMat here
- }, [vehicleTypeLocal, form]);
-
-   // ✅ PRINT handling with safe pipeline
-   const handlePrint = async (which) => {
-   // Ensure latest Segmented value (Yes/No) is committed to vals
-   await new Promise(requestAnimationFrame);
-   if (which === "pre") {
-     await handleSmartPrint(preRef.current);
-   } else if (which === "post") {
-     await handleSmartPrint(postRef.current);
-   }
- };
+  // ---- Auto Save (→ Google Form) ----
+  const fmtDDMMYYYY = (d) => (d ? dayjs(d).format("DD/MM/YYYY") : "");
+  // Use the same separator everywhere for obs round-trip
+const OBS_SEP = " # ";
 
 
-  // SAVE handling → open Google Form with prefilled values (user-visible)
-  // const handleSave = async () => {
-  //   try {
-  //     await form.validateFields([
-  //       "custName",
-  //       "custMobile",
-  //       "branch",
-  //       "mechanic",
-  //     ]);
-  //     const vals = form.getFieldsValue(true);
-  //     const url = buildPrefillUrl(vals, totals.grand);
-  //     window.open(url, "_blank", "noopener");
-  //     message.success("Opened Google Form with pre-filled data.");
-  //   } catch {
-  //     message.error("Please complete required fields before saving.");
-  //   }
-  // };
-
-  // AUTO-SAVE handling → silent submit to Google Form (sheet gets the row)
   const handleAutoSave = async () => {
     try {
-      await form.validateFields([
-        "custName",
-        "custMobile",
-        "branch",
-        "mechanic",
-      ]);
-       //const valsRaw = form.getFieldsValue(true);
-        //const vals = { ...valsRaw, floorMat: floorMatWatch };
+      await form.validateFields(["custName", "custMobile", "branch", "mechanic"]);
 
-        const valsRaw = form.getFieldsValue(true);
-const vals = { ...valsRaw, floorMat, obs: obsNotes };
+      const vals = form.getFieldsValue(true);
+     
 
+
+      //const vehOrServiceTypeValue = vals.vehicleType || vals.serviceType || "";
       const amt = Number.isFinite(totals.grand) ? Math.round(totals.grand) : 0;
+      const kmOnlyDigits = String(vals.km || "").replace(/\D/g, "");
+      const floorMatStr =
+        typeof vals.floorMat === "string"
+          ? vals.floorMat
+          : vals.floorMat === true
+          ? "Yes"
+          : vals.floorMat === false
+          ? "No"
+          : "";
+       const obsOneLine =
+  String(vals.obs || "")
+    // collapse any newline (and surrounding spaces) to our separator
+    .replace(/\s*\r?\n\s*/g, OBS_SEP)
+    // trim any accidental leading/trailing separators or spaces
+    .replace(new RegExp(`^(?:\\s*${OBS_SEP}\\s*)+|(?:\\s*${OBS_SEP}\\s*)+$`, "g"), "")
+    .trim();
 
-      // Map app values to Google entry fields
       const entries = {
-        [GFORM_ENTRY.name]: vals.custName || "",
-        [GFORM_ENTRY.mobile]: String(vals.custMobile || ""),
-        [GFORM_ENTRY.branch]: vals.branch || "",
-        [GFORM_ENTRY.mechanic]: vals.mechanic || "",
-        [GFORM_ENTRY.amount]: String(amt),
-      };
+  [GFORM_ENTRY.branch]:        vals.branch || "",
+  [GFORM_ENTRY.mechanic]:      vals.mechanic || "",
+  [GFORM_ENTRY.executive]:     vals.executive || "",
+  [GFORM_ENTRY.expectedDelivery]: fmtDDMMYYYY(vals.expectedDelivery),
+  [GFORM_ENTRY.regNo]:         vals.regNo || "",
+  [GFORM_ENTRY.model]:         vals.model || "",
+  [GFORM_ENTRY.colour]:        vals.colour || "",
+  [GFORM_ENTRY.km]:            kmOnlyDigits || "",
+  [GFORM_ENTRY.custName]:      vals.custName || "",
+  [GFORM_ENTRY.custMobile]:    String(vals.custMobile || ""),
+  [GFORM_ENTRY.obs]:           obsOneLine,
+  [GFORM_ENTRY.vehicleType]:   vals.vehicleType || "",
+  [GFORM_ENTRY.serviceType]:   vals.serviceType || "",   // ✅ now included
+  [GFORM_ENTRY.floorMat]:      floorMatStr,
+  [GFORM_ENTRY.amount]:        String(amt),
+  [GFORM_ENTRY.jcNo]:          vals.jcNo || "",
+};
+
 
       autoSubmitToGoogle(entries);
+
       message.loading({ content: "Auto-saving to Google Sheet…", key: "autosave" });
       setTimeout(() => {
-        message.success({ content: "Saved to Google Sheet via Google Form.", key: "autosave", duration: 2 });
+        message.success({
+          content: "All fields saved to Google Sheet via Google Form.",
+          key: "autosave",
+          duration: 2,
+        });
       }, 1200);
     } catch {
       message.error("Please complete required fields before auto-saving.");
@@ -506,68 +475,73 @@ const vals = { ...valsRaw, floorMat, obs: obsNotes };
   // Pull everything we need for printing
   const vals = form.getFieldsValue(true);
 
-  // Build "observation" list = labour descriptions + typed notes (no prices)
+  // Observation list for print (no prices)
   const observationLines = [
-    ...labourRows.map((r) => r.desc),
+    ...(labourRows || []).map((r) => r.desc),
     ...(vals?.obs ? vals.obs.split("\n").map((s) => s.trim()).filter(Boolean) : []),
   ];
 
-  // WhatsApp share handler
-const handleShareWhatsApp = async () => {
-  try {
-    // Validate minimum fields we reference in the message
-    await form.validateFields(["custName", "custMobile", "branch"]);
-
-    const valsNow = form.getFieldsValue(true);
-    const mobileE164 = normalizeINPhone(valsNow.custMobile);
-
-    if (!mobileE164) {
-      message.error("Enter a valid 10-digit mobile number (India).");
-      return;
+  const handleShareWhatsApp = async () => {
+    try {
+      await form.validateFields(["custName", "custMobile", "branch"]);
+      const valsNow = form.getFieldsValue(true);
+      const mobileE164 = normalizeINPhone(valsNow.custMobile);
+      if (!mobileE164) {
+        message.error("Enter a valid 10-digit mobile number (India).");
+        return;
+      }
+      const msg = buildWelcomeMsg(valsNow, totals);
+      message.loading({ key: "share", content: "Preparing WhatsApp message…" });
+      openWhatsAppOrSMS({
+        mobileE164,
+        text: msg,
+        onFailToWhatsApp: () => {
+          message.info({
+            key: "share",
+            content: "WhatsApp may not be available. Falling back to SMS composer…",
+            duration: 2,
+          });
+        },
+      });
+      setTimeout(() => {
+        message.success({ key: "share", content: "Ready to send.", duration: 2 });
+      }, 800);
+    } catch {
+      message.error("Please complete required fields (Name, Mobile, Branch).");
     }
+  };
 
-    const msg = buildWelcomeMsg(valsNow, totals);
-
-    message.loading({ key: "share", content: "Preparing WhatsApp message…" });
-
-    openWhatsAppOrSMS({
-      mobileE164,
-      text: msg,
-      onFailToWhatsApp: () => {
-        message.info({
-          key: "share",
-          content:
-            "WhatsApp may not be available. Falling back to SMS composer…",
-          duration: 2,
-        });
-      },
-    });
-
-    // Slight delay to swap toast
-    setTimeout(() => {
-      message.success({ key: "share", content: "Ready to send.", duration: 2 });
-    }, 800);
-  } catch {
-    message.error("Please complete required fields (Name, Mobile, Branch).");
-  }
-};
-
+  //const serviceValueForUI = serviceTypeLocal ? [serviceTypeLocal] : [];
 
   return (
     <div style={{ padding: screens.xs ? 8 : 16 }}>
       {/* Screen UI (hidden when printing) */}
       <div className="no-print">
         <Card size="small" bordered>
-          <Title level={4} style={{ margin: 0 }}>SHANTHA MOTORS — JOB CARD</Title>
-          <Text type="secondary">Multi Brand Two Wheeler Sales & Service</Text>
-        </Card>
+  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+    <div>
+      <Title level={4} style={{ margin: 0 }}>SHANTHA MOTORS — JOB CARD</Title>
+      <Text type="secondary">Multi Brand Two Wheeler Sales & Service</Text>
+    </div>
 
-        <Form
-          form={form}
-          layout="vertical"
-          initialValues={initialValues}
-          style={{ marginTop: 12 }}
-        >
+    {/* Add the FetchJobcard button */}
+    <FetchJobcard
+      form={form}
+      sheetUrl={SHEET_CSV_URL}              // reuses the published CSV you already have
+      parseCSV={parseCSV}                   // reuse helper from this file
+      formatReg={formatReg}                 // reuse helper from this file
+      buildRows={buildRows}                 // reuse helper from this file
+      defaultGstLabour={DEFAULT_GST_LABOUR} // reuse constant from this file
+      lists={{ BRANCHES, MECHANIC, EXECUTIVES, VEHICLE_TYPES, SERVICE_TYPES }}
+      setServiceTypeLocal={setServiceTypeLocal}
+      setVehicleTypeLocal={setVehicleTypeLocal}
+      setRegDisplay={setRegDisplay}
+    />
+  </div>
+</Card>
+
+
+        <Form form={form} layout="vertical" initialValues={initialValues} style={{ marginTop: 12 }}>
           {/* Job Details */}
           <Card size="small" bordered title="Job Details">
             <Row gutter={12}>
@@ -718,17 +692,15 @@ const handleShareWhatsApp = async () => {
               </Col>
 
               <Col xs={24} sm={12}>
-                <Form.Item
-                  label="Call Status"
-                  name="callStatus"
-                >
+                <Form.Item label="Call Status" name="callStatus">
                   <Input placeholder="Connected / Not reachable / Will call back" />
                 </Form.Item>
               </Col>
+
               <Col xs={24}>
-                <Form.Item label="Customer Observation (additional notes)" name="obs">
-                  <Input.TextArea rows={3} placeholder="Write the customer's observations..." />
-                </Form.Item>
+                 <Form.Item label="Customer Observation (additional notes)" name="obs">
+  <Input.TextArea rows={3} placeholder="Write the customer's observations..." />
+</Form.Item>
               </Col>
             </Row>
           </Card>
@@ -740,7 +712,7 @@ const handleShareWhatsApp = async () => {
                 <Form.Item label="Service Type (tick one)">
                   <Checkbox.Group
                     options={serviceOptions}
-                    value={serviceValueForUI}
+                    value={serviceTypeLocal ? [serviceTypeLocal] : []}
                     onChange={handleServiceCheckbox}
                   />
                 </Form.Item>
@@ -799,8 +771,6 @@ const handleShareWhatsApp = async () => {
                   <Segmented className="blue-segmented" block options={FUEL_LEVELS} />
                 </Form.Item>
               </Col>
-
-              
             </Row>
           </Card>
 
@@ -881,26 +851,18 @@ const handleShareWhatsApp = async () => {
           {/* ACTION BUTTONS */}
           <Row justify="end" style={{ marginTop: 12 }} gutter={8}>
             <Col>
-              <Button onClick={handleAutoSave}>
-                Save
+              <Button onClick={handleAutoSave}>Save</Button>
+            </Col>
+
+            <Col>
+              <Button
+                type="default"
+                icon={<FaWhatsapp style={{ color: "#25D366" }} />}
+                onClick={handleShareWhatsApp}
+              >
+                WhatsApp/SMS
               </Button>
             </Col>
-            {/* <Col>
-              <Button onClick={handleSave}>
-                Save (Open Google Form)
-              </Button>
-            </Col> */}
-
-<Col>
-  <Button
-    type="default"
-    icon={<FaWhatsapp style={{ color: "#25D366" }} />}
-    onClick={handleShareWhatsApp}
-  >
-    WhatsApp/SMS
-  </Button>
-</Col>
-
 
             <Col>
               <Button type="primary" onClick={() => handlePrint("pre")}>
@@ -916,7 +878,7 @@ const handleShareWhatsApp = async () => {
         </Form>
       </div>
 
-       {/* ✅ PRINT SHEETS with refs */}
+      {/* PRINT SHEETS with refs */}
       <PreServiceSheet
         ref={preRef}
         active
