@@ -4,6 +4,8 @@ import {
   Row, Col, Form, Input, InputNumber, Select, Button, Radio, message, Checkbox, Switch, Divider
 } from "antd";
 import { PrinterOutlined, PlusOutlined, DeleteOutlined } from "@ant-design/icons";
+import ViewSheet from "./ViewSheet";
+
 
 /* ======================
    GOOGLE FORM INTEGRATION
@@ -58,6 +60,20 @@ const parseCsv = (text) => {
   if (col !== "" || row.length) { row.push(col); rows.push(row); }
   return rows;
 };
+
+// Adapter for ViewSheet: CSV text -> { headers, rows }
+const parseCsvForView = (text) => {
+  const rows = parseCsv(text);                 // array[][] from your minimal parser
+  if (!rows.length) return { headers: [], rows: [] };
+  const headers = rows[0].map((h, i) => h || `Col ${i + 1}`);
+  const body = rows.slice(1).map((r) => {
+    const obj = {};
+    headers.forEach((h, i) => (obj[h] = r[i] ?? ""));
+    return obj;
+  });
+  return { headers, rows: body };
+};
+
 
 const fetchSheetRowsCSV = async (url) => {
   const res = await fetch(url, { cache: "no-store" });
@@ -366,7 +382,7 @@ export default function Quotation() {
     const total = principal + totalInterest;
     return months > 0 ? total / months : 0;
   };
-  const tenuresForSet = (s) => (s === "12" ? [12, 18, 24, 36] : [24, 30, 36, 48]);
+  const tenuresForSet = (s) => (s === "12" ? [12, 18, 24, 30] : [24, 30, 36, 48]);
 
   // ---------- Android-proof A4 print ----------
   const handlePrint = async () => {
@@ -832,7 +848,16 @@ const text = [...header, ...vblocks, ...afterVehicles, ...footer].join("\n");
                     <Radio value="SHANTHA">Shantha Motors</Radio>
                     <Radio value="NH">NH Motors (Honda)</Radio>
                   </Radio.Group>
+                   <ViewSheet
+  sheetCsvUrl={RESPONSES_CSV_URL}   // or SHEET_CSV_URL if you want the vehicle data
+  parseCSV={parseCsvForView}
+  buttonProps={{ type: "primary" }}
+  buttonText="View Sheet"
+/>
+
                 </Form.Item>
+
+                
               </Col>
 
               <Col span={24}>
@@ -1310,10 +1335,10 @@ const text = [...header, ...vblocks, ...afterVehicles, ...footer].join("\n");
       {brand === "SHANTHA" ? (
         <>
           <div className="addr-line" style={{ fontSize: "13pt" }}>
-            • D-Group Layout • Hegganahalli  • Channenahali • Nelagadrahalli
+            • Muddinapalya • Hegganahalli   • Nelagadrahalli  • Andrahalli
           </div>
           <div className="addr-line" style={{ fontSize: "13pt" }}>
-            • Kadabagere  • Muddinapalya  • Andrahalli  • Tavarekere
+            • Kadabagere   • Channenahali  • Tavarekere • D-Group Layout
           </div>
           <div style={{ marginTop: 6, fontWeight: 600 }}>
             Mob: 9731366921 / 8073283502 / 9035131806
