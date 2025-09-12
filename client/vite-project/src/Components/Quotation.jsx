@@ -610,22 +610,40 @@ export default function Quotation() {
       form.setFieldsValue({ serialNo: serial });
     }
 
-    // Build Option C: concatenate V1/V2/V3 in remarks
-    const v1 = {
-      company: v.company, model: v.bikeModel, variant: v.variant,
-      
-    };
-    const all = [v1, ...extraVehicles];
-    const lines = all.map((it, idx) => {
-      const title = `V${idx + 1}`;
-      const tset = tenuresForSet(it.emiSet || "12");
-      const emiLine = tset.map(mo => `${mo}m ${inr0(monthlyFor(it.price || it.onRoadPrice, it.downPayment || it.dp || 0, mo))}`).join(", ");
-      return `${title}: ${it.company} ${it.model} ${it.variant} | Price ${inr0(it.price || it.onRoadPrice)} | DP ${inr0(it.downPayment || it.dp || 0)} | EMI ${emiLine}`;
-    });
+  // Build compact Remarks: Company + Model + Variant for each vehicle (V1..V3) + Free Extra Fittings
+const labelOf = (c, m, v) => [c, m, v].filter(Boolean).join(" ");
 
-    const mergedRemarks = [v.remarks?.trim() || "", ...lines].filter(Boolean).join(" | ");
-    const entries = toEntries({ ...v, remarks: mergedRemarks }, executiveName);
-    submitToGoogleForm(entries);
+// Vehicles (V1..V3)
+const vehicleLines = [];
+{
+  // V1 (main)
+  const c = v.company || "";
+  const m = v.bikeModel || "";
+  const varnt = v.variant || "";
+  const label = labelOf(c, m, varnt);
+  if (label) vehicleLines.push(`V1: ${label}`);
+}
+// V2..V3 (extra vehicles)
+extraVehicles.forEach((ev, i) => {
+  const label = labelOf(ev.company || "", ev.model || "", ev.variant || "");
+  if (label) vehicleLines.push(`V${i + 2}: ${label}`);
+});
+
+// Free Extra Fittings
+const fittingsLine = Array.isArray(fittings) && fittings.length
+  ? `Fittings: ${Array.from(new Set(fittings.filter(Boolean))).join(", ")}`
+  : "";
+
+// Merge with any user-typed remarks, separated by " | "
+const mergedRemarks = [
+  String(v.remarks || "").trim(),
+  ...vehicleLines,
+  fittingsLine
+].filter(Boolean).join(" | ");
+
+// Send to Google Form
+const entries = toEntries({ ...v, remarks: mergedRemarks }, executiveName);
+submitToGoogleForm(entries);
 
     return v;
   };
@@ -851,6 +869,7 @@ const text = [...header, ...vblocks, ...afterVehicles, ...footer].join("\n");
                    <ViewSheet
   sheetCsvUrl={RESPONSES_CSV_URL}   // or SHEET_CSV_URL if you want the vehicle data
   parseCSV={parseCsvForView}
+  dateColumn="Timestamp"
   buttonProps={{ type: "primary" }}
   buttonText="View Sheet"
 />
