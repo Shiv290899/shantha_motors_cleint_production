@@ -519,12 +519,12 @@ const OBS_SEP = " # ";
       {/* Screen UI (hidden when printing) */}
       <div className="no-print">
         <Card size="small" bordered>
-  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+  <div style={{  display: "flex", justifyContent: "space-between", alignItems: "centre", gap: 8 }}>
     <div>
       <Title level={4} style={{ margin: 0 }}>SHANTHA MOTORS — JOB CARD</Title>
       <Text type="secondary">Multi Brand Two Wheeler Sales & Service</Text>
     </div>
-
+  <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
     {/* Add the FetchJobcard button */}
     <FetchJobcard
       form={form}
@@ -538,12 +538,15 @@ const OBS_SEP = " # ";
       setVehicleTypeLocal={setVehicleTypeLocal}
       setRegDisplay={setRegDisplay}
     />
+    
     <ViewSheet
    sheetCsvUrl={SHEET_CSV_URL}
    parseCSV={parseCSV}
+   dateColumn="Timestamp"
    buttonProps={{ type: "primary" }}
    buttonText="View Sheet"
  />
+ </div>
   </div>
 </Card>
 
