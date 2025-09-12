@@ -2,7 +2,6 @@
 import React, { useMemo, forwardRef } from "react";
 import { inr, fmtDate, amountInWords } from "../utils/printUtils";
 
-
 /**
  * Updated for Android-safe printing (when used with handleSmartPrint in parent)
  * - Forwarded ref so parent can pass DOM node to print helper
