@@ -275,7 +275,7 @@ export default function ViewSheet({
   };
 
   // Mark current as seen → sets baseline to current max date
-  const markAsSeen = () => {
+  const _markAsSeen = () => {
     const maxDate = computeMaxDate(rows);
     if (maxDate) {
       localStorage.setItem(keyFor(sheetCsvUrl, "baselineMaxDate"), maxDate.toISOString());
@@ -348,7 +348,7 @@ export default function ViewSheet({
   };
 
   // URL sync (?from=YYYY-MM-DD&to=YYYY-MM-DD)
-  const syncUrl = () => {
+  const _syncUrl = () => {
     const usp = new URLSearchParams(window.location.search);
     if (range && (range[0] || range[1])) {
       if (range[0] && range[0].isValid()) usp.set("from", range[0].format("YYYY-MM-DD"));
@@ -415,7 +415,7 @@ export default function ViewSheet({
   };
 
   // Saved views
-  const saveCurrentView = () => {
+  const _saveCurrentView = () => {
     const name = (viewName || "").trim();
     if (!name) return message.warning("Enter a view name");
     const data = {
@@ -433,7 +433,7 @@ export default function ViewSheet({
     setViewName("");
   };
 
-  const applyView = (name) => {
+  const _applyView = (name) => {
     const v = views.find((x) => x.name === name);
     if (!v) return;
     setSelectedView(name);
@@ -453,7 +453,7 @@ export default function ViewSheet({
     message.success(`Applied view "${name}"`);
   };
 
-  const deleteView = (name) => {
+  const _deleteView = (name) => {
     const next = views.filter((v) => v.name !== name);
     setViews(next);
     localStorage.setItem(keyFor(sheetCsvUrl, "views"), JSON.stringify(next));
@@ -496,124 +496,123 @@ export default function ViewSheet({
         width="90%"
         onCancel={() => setOpen(false)}
         footer={[
-          // Left section: filters & tools
-          <Space key="left" style={{ marginRight: "auto", flexWrap: "wrap" }}>
-            {/* Date range */}
-            <Tooltip
-              title={
-                detectedDateKey
-                  ? `Filtering by date column: ${detectedDateKey}`
-                  : `No date column detected. Pass 'dateColumn' prop (e.g., "Timestamp").`
-              }
-            >
-              <RangePicker
-                allowClear
-                value={range}
-                onChange={(val) => setRange(val)}
-                disabled={!detectedDateKey}
-                format="YYYY-MM-DD"
-              />
-            </Tooltip>
+  // Left section: filters & tools
+  <Space key="left" style={{ marginRight: "auto", flexWrap: "wrap" }}>
+    {/* Date range */}
+    <Tooltip
+      title={
+        detectedDateKey
+          ? `Filtering by date column: ${detectedDateKey}`
+          : `No date column detected. Pass 'dateColumn' prop (e.g., "Timestamp").`
+      }
+    >
+      <RangePicker
+        allowClear
+        value={range}
+        onChange={(val) => setRange(val)}
+        disabled={!detectedDateKey}
+        format="YYYY-MM-DD"
+      />
+    </Tooltip>
 
-            {/* Presets (now actually used) */}
-            <Space size="small">
-              {presets.map((p) => (
-                <Button
-                  key={p.label}
-                  onClick={() => setRange([p.range[0], p.range[1]])}
-                  disabled={!detectedDateKey}
-                >
-                  {p.label}
-                </Button>
-              ))}
-            </Space>
+    {/* Presets */}
+    <Space size="small">
+      {presets.map((p) => (
+        <Button
+          key={p.label}
+          onClick={() => setRange([p.range[0], p.range[1]])}
+          disabled={!detectedDateKey}
+        >
+          {p.label}
+        </Button>
+      ))}
+    </Space>
 
-            <Button onClick={() => setRange(null)}>Clear</Button>
-            <Button onClick={syncUrl}>Share link</Button>
+    {/* <Button onClick={() => setRange(null)}>Clear</Button> */}
+    {/* <Button onClick={syncUrl}>Share link</Button> */}
 
-            {/* Excel export */}
-            <Button onClick={exportExcel}>Download Excel (.xlsx)</Button>
+    {/* Excel export */}
+    <Button onClick={exportExcel}>Download Excel (.xlsx)</Button>
 
-            {/* Column chooser */}
-            <Dropdown menu={columnMenu} trigger={["click"]}>
-              <Button>Columns</Button>
-            </Dropdown>
+    {/* Column chooser */}
+    <Dropdown menu={columnMenu} trigger={["click"]}>
+      <Button>Columns</Button>
+    </Dropdown>
 
-            {/* Density toggle: cozy → middle, compact → small */}
-            <Segmented
-              value={density}
-              onChange={(val) => {
-                setDensity(val);
-                localStorage.setItem(keyFor(sheetCsvUrl, "density"), String(val));
-              }}
-              options={[
-                { label: "Cozy", value: "cozy" },
-                { label: "Compact", value: "compact" },
-              ]}
-            />
+    {/* <Segmented
+      value={density}
+      onChange={(val) => {
+        setDensity(val);
+        localStorage.setItem(keyFor(sheetCsvUrl, "density"), String(val));
+      }}
+      options={[
+        { label: "Cozy", value: "cozy" },
+        { label: "Compact", value: "compact" },
+      ]}
+    /> */}
 
-            {/* Saved views: selector + save + delete */}
-            <Space size="small" wrap>
-              <Select
-                placeholder="Load view…"
-                style={{ width: 160 }}
-                value={selectedView || undefined}
-                onChange={(v) => applyView(v)}
-                allowClear
-                options={views.map((v) => ({ label: v.name, value: v.name }))}
-              />
-              <Input
-                placeholder="New view name"
-                value={viewName}
-                onChange={(e) => setViewName(e.target.value)}
-                style={{ width: 160 }}
-              />
-              <Button onClick={saveCurrentView}>Save view</Button>
-              <Popconfirm
-                title="Delete selected view?"
-                okText="Delete"
-                onConfirm={() => selectedView && deleteView(selectedView)}
-                disabled={!selectedView}
-              >
-                <Button danger disabled={!selectedView}>
-                  Delete view
-                </Button>
-              </Popconfirm>
+    {/* Saved views: selector + save + delete */}
+    {/* <Space size="small" wrap>
+      <Select
+        placeholder="Load view…"
+        style={{ width: 160 }}
+        value={selectedView || undefined}
+        onChange={(v) => applyView(v)}
+        allowClear
+        options={views.map((v) => ({ label: v.name, value: v.name }))}
+      />
+      <Input
+        placeholder="New view name"
+        value={viewName}
+        onChange={(e) => setViewName(e.target.value)}
+        style={{ width: 160 }}
+      />
+      <Button onClick={saveCurrentView}>Save view</Button>
+      <Popconfirm
+        title="Delete selected view?"
+        okText="Delete"
+        onConfirm={() => selectedView && deleteView(selectedView)}
+        disabled={!selectedView}
+      >
+        <Button danger disabled={!selectedView}>
+          Delete view
+        </Button>
+      </Popconfirm>
 
-              {/* Assign default preset (stored locally) */}
-              <Select
-                placeholder="Default preset…"
-                style={{ width: 160 }}
-                value={localStorage.getItem(keyFor(sheetCsvUrl, "defaultPreset")) || undefined}
-                options={presets.map((p) => ({ label: p.label, value: p.label }))}
-                allowClear
-                onChange={(val) => {
-                  if (val) localStorage.setItem(keyFor(sheetCsvUrl, "defaultPreset"), val);
-                  else localStorage.removeItem(keyFor(sheetCsvUrl, "defaultPreset"));
-                  message.success(val ? `Default preset set to "${val}"` : "Default preset cleared");
-                }}
-              />
-            </Space>
-          </Space>,
+      <Select
+        placeholder="Default preset…"
+        style={{ width: 160 }}
+        value={localStorage.getItem(keyFor(sheetCsvUrl, "defaultPreset")) || undefined}
+        options={presets.map((p) => ({ label: p.label, value: p.label }))}
+        allowClear
+        onChange={(val) => {
+          if (val) localStorage.setItem(keyFor(sheetCsvUrl, "defaultPreset"), val);
+          else localStorage.removeItem(keyFor(sheetCsvUrl, "defaultPreset"));
+          message.success(val ? `Default preset set to "${val}"` : "Default preset cleared");
+        }}
+      />
+    </Space> */}
+  </Space>,
 
-          // Right section: refresh with diff badge + mark-as-seen + close
-          <Space key="right">
-            <Badge
-              count={newCount > 0 ? `+${newCount}` : 0}
-              color="green"
-              offset={[-6, 6]}
-              style={{ boxShadow: "0 0 0 1px #fff inset" }}
-            >
-              <Button onClick={fetchCsv} loading={loading}>
-                Refresh
-              </Button>
-            </Badge>
+  // Right section: refresh + close
+  <Space key="right">
+    <Badge
+      count={newCount > 0 ? `+${newCount}` : 0}
+      color="green"
+      offset={[-6, 6]}
+      style={{ boxShadow: "0 0 0 1px #fff inset" }}
+    >
+      <Button onClick={fetchCsv} loading={loading}>
+        Refresh
+      </Button>
+    </Badge>
 
-            <Button onClick={markAsSeen}>Mark as seen</Button>
+    {/* <Button onClick={markAsSeen}>Mark as seen</Button> */}
 
-            <Button onClick={() => setOpen(false)}>Close</Button>
-          </Space>,
-        ]}
+    <Button onClick={() => setOpen(false)}>Close</Button>
+  </Space>,
+]}
+
       >
         {/* highlight style */}
         <style>
