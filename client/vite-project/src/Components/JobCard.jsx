@@ -310,7 +310,7 @@ export default function JobCard() {
       mechanic: "",
       serviceType: undefined,
       vehicleType: undefined,
-      floorMat: undefined,
+      floorMat:"No",
       fuelLevel: undefined,
       regNo: "",
       model: "",
@@ -385,6 +385,7 @@ export default function JobCard() {
         labourRows: buildRows(next, defaultVehicle),
         gstLabour: DEFAULT_GST_LABOUR,
         discounts: { labour: 0 },
+        floorMat: "No",
       });
       message.success(`Applied preset: ${next} / ${defaultVehicle}`);
     } else {
@@ -429,7 +430,7 @@ const OBS_SEP = " # ";
           ? "Yes"
           : vals.floorMat === false
           ? "No"
-          : "";
+          : "No";
        const obsOneLine =
   String(vals.obs || "")
     // collapse any newline (and surrounding spaces) to our separator
@@ -744,7 +745,7 @@ const OBS_SEP = " # ";
                         setVehicleTypeLocal(val);
                         form.setFieldsValue({ vehicleType: val });
                         if (val !== "Scooter") {
-                          form.setFieldsValue({ floorMat: undefined });
+                          // keep existing value; default is "No"
                         }
                         if (serviceTypeLocal) {
                           form.setFieldsValue({
@@ -764,6 +765,7 @@ const OBS_SEP = " # ";
                   <Form.Item
                     label="Floor Mat (Mandatory)"
                     name="floorMat"
+                    initialValue ="No"
                     rules={[{ required: true, message: "Please select Yes/No" }]}
                   >
                     <Segmented
