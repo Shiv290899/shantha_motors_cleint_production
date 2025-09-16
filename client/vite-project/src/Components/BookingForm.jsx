@@ -568,12 +568,7 @@ export default function BookingForm() {
 
             {/* EMI Results */}
             <Row gutter={[16, 16]}>
-              <Col xs={24} sm={12} lg={6}>
-                <Card size="small" bordered style={{ borderRadius: 12 }}>
-                  <Statistic title={isMobile ? "Loan (incl. fee)" : "Loan Amount (incl. ₹8,000 fee)"} value={inr0(emiCalc.principal)} />
-                </Card>
-              </Col>
-
+             
               <Col xs={24} sm={12} lg={6}>
                 <Card size="small" bordered style={{ borderRadius: 12 }}>
                   <Statistic title="Monthly Payment" value={inr0(emiCalc.monthlyPay)} />
