@@ -118,6 +118,7 @@ const EXECUTIVES = [
   { name: "Rani", phone: "9108970455" },
   { name: "Nikitha", phone: "9535190015" },
   { name: "Prakash", phone: "9740176476" },
+  { name: "Swathi", phone: "6363116317" },
   { name: "Kumar", phone: "7975807667" },
   { name: "Sujay", phone: "7022878048" },
   { name: "Kavi", phone: "9108970455" },
