@@ -272,7 +272,7 @@ export default function Quotation() {
 
   const [emiSet, setEmiSet] = useState("12");
   const tenures = useMemo(
-    () => (emiSet === "12" ? [12, 18, 24, 30] : [24, 30, 36, 48]),
+    () => (emiSet === "12" ? [12, 18, 24, 36] : [24, 30, 36, 48]),
     [emiSet]
   );
 
