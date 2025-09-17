@@ -1,19 +1,16 @@
 // FetchQuot.jsx
-import React, {  useState } from "react";
+import React, { useState } from "react";
 import { Button, Modal, Radio, Input, List, Space, Spin, message } from "antd";
 
 /**
- * Props (mirror the style of FetchJobcard.jsx):
- * - form                                     // AntD Form instance from QuotationOnePage
- * - responsesCsvUrl                          // Google Form "responses" published CSV
- * - parseCsv                                 // (text) => string[][]
- * - EXECUTIVES                               // [{name, phone}]
- *
- * - setBrand, setMode, setVehicleType,
- *   setFittings, setDocsReq, setEmiSet,
- *   setDownPayment, setOnRoadPrice,
- *   setCompany, setModel, setVariant,
- *   setExtraVehicles                        // state setters from QuotationOnePage
+ * Props:
+ * - form
+ * - responsesCsvUrl
+ * - parseCsv
+ * - EXECUTIVES
+ * - setBrand, setMode, setVehicleType, setFittings, setDocsReq, setEmiSet,
+ *   setDownPayment, setOnRoadPrice, setCompany, setModel, setVariant, setExtraVehicles
+ * - buttonText, buttonProps
  */
 export default function FetchQuot({
   form,
@@ -51,8 +48,23 @@ export default function FetchQuot({
     );
 
   const payloadColIndex = (headers) => findHeader(headers, "payload");
+  const serialColIndex = (headers) => {
+    for (const k of ["quotation no", "quotation number", "quote no", "serial"]) {
+      const i = findHeader(headers, k);
+      if (i >= 0) return i;
+    }
+    return -1;
+  };
   const phoneColIndex = (headers) => {
     for (const k of ["phone", "mobile", "contact"]) {
+      const i = findHeader(headers, k);
+      if (i >= 0) return i;
+    }
+    return -1;
+  };
+  // NEW: branch column picker
+  const branchColIndex = (headers) => {
+    for (const k of ["branch", "branches"]) {
       const i = findHeader(headers, k);
       if (i >= 0) return i;
     }
@@ -101,6 +113,7 @@ export default function FetchQuot({
       company: "",
       model: "",
       variant: "",
+      branch: "", // may be injected from sheet later
       formValues: {
         serialNo: "",
         name: "",
@@ -112,9 +125,26 @@ export default function FetchQuot({
         onRoadPrice: 0,
         executive: EXECUTIVES[0]?.name || "",
         remarks: "",
+        branch: "", // may be injected from sheet later
       },
       extraVehicles: [],
     };
+  };
+
+  // Try payload column first, then scan entire row for JSON-looking cell
+  const parseAnyJsonCell = (row, pIdx) => {
+    if (pIdx >= 0) {
+      const maybe = safeJson(row[pIdx]);
+      if (maybe) return maybe;
+    }
+    for (let j = 0; j < row.length; j++) {
+      const cell = row[j];
+      if (cell && typeof cell === "string" && cell.trim().startsWith("{")) {
+        const maybe = safeJson(cell);
+        if (maybe) return maybe;
+      }
+    }
+    return null;
   };
 
   // apply into form + local states
@@ -147,6 +177,7 @@ export default function FetchQuot({
         onRoadPrice: Number(fv.onRoadPrice ?? data.onRoadPrice ?? 0),
         executive: fv.executive || EXECUTIVES[0]?.name || "",
         remarks: fv.remarks || "",
+        branch: fv.branch || data.branch || "", // <-- branch set here
       });
 
       // keep mirror in sync
@@ -166,9 +197,7 @@ export default function FetchQuot({
   const runSearch = async () => {
     const q = String(query || "").trim();
     if (!q) {
-      message.warning(
-        mode === "serial" ? "Enter a Quotation No." : "Enter a Mobile number."
-      );
+      message.warning(mode === "serial" ? "Enter a Quotation No." : "Enter a Mobile number.");
       return;
     }
 
@@ -181,7 +210,9 @@ export default function FetchQuot({
       const body = rows.slice(1);
 
       const pIdx = payloadColIndex(headers);
+      const sIdx = serialColIndex(headers);
       const mIdx = phoneColIndex(headers);
+      const bIdx = branchColIndex(headers); // NEW
 
       const candidates = [];
       const qMobile = tenDigits(q);
@@ -189,30 +220,39 @@ export default function FetchQuot({
       // scan newest first
       for (let i = body.length - 1; i >= 0; i--) {
         const r = body[i];
-        const payload = pIdx >= 0 ? safeJson(r[pIdx]) : null;
+        const payload = parseAnyJsonCell(r, pIdx);
 
         const serial = payload?.formValues?.serialNo
           ? String(payload.formValues.serialNo).trim()
-          : "";
+          : (sIdx >= 0 ? String(r[sIdx] || "").trim() : "");
 
         const mobInPayload = tenDigits(payload?.formValues?.mobile);
-
         const phoneCell = mIdx >= 0 ? tenDigits(r[mIdx]) : "";
+        const branchCell = bIdx >= 0 ? String(r[bIdx] || "").trim() : ""; // NEW
 
-        const isSerialMatch =
-          mode === "serial" && serial && serial === q;
+        // Merge the branch from sheet into payload so UI can use it
+        const mergedPayload = (() => {
+          const base = payload ? { ...payload } : {};
+          base.branch = base.branch || branchCell;
+          base.formValues = {
+            ...(base.formValues || {}),
+            branch: (base.formValues && base.formValues.branch) || branchCell,
+          };
+          return base;
+        })();
+
+        const isSerialMatch = mode === "serial" && serial && serial === q;
 
         const isMobileMatch =
           mode === "mobile" &&
           ((mobInPayload && mobInPayload === qMobile) ||
             (phoneCell && phoneCell === qMobile) ||
-            // allow suffix match if user typed fewer than 10 digits
             (qMobile.length < 10 &&
               ((mobInPayload && mobInPayload.endsWith(qMobile)) ||
                 (phoneCell && phoneCell.endsWith(qMobile)))));
 
         if (isSerialMatch || isMobileMatch) {
-          candidates.push({ row: r, payload, ts: toTime(r) });
+          candidates.push({ row: r, payload: mergedPayload, ts: toTime(r) });
         }
       }
 
@@ -252,6 +292,7 @@ export default function FetchQuot({
         .filter(Boolean)
         .join(" ") || "—";
     const price = Number(fv.onRoadPrice ?? p.onRoadPrice ?? 0);
+    const branch = fv.branch || p.branch || "—";
 
     return (
       <List.Item
@@ -265,7 +306,7 @@ export default function FetchQuot({
           <div><b>Quotation:</b> {serial} &nbsp; <b>Name:</b> {name}</div>
           <div><b>Mobile:</b> {mobile} &nbsp; <b>Vehicle:</b> {veh}</div>
           <div style={{ gridColumn: "1 / span 2", color: "#999" }}>
-            <b>Price:</b> ₹{price.toLocaleString("en-IN")}
+            <b>Branch:</b> {branch} &nbsp; <b>Price:</b> ₹{price.toLocaleString("en-IN")}
           </div>
         </div>
       </List.Item>
@@ -274,9 +315,9 @@ export default function FetchQuot({
 
   return (
     <>
-       <Button {...buttonProps} onClick={() => setOpen(true)}>
-+        {buttonText}
-+      </Button>
+      <Button {...buttonProps} onClick={() => setOpen(true)}>
+        {buttonText}
+      </Button>
 
       <Modal
         title="Fetch Quotation (Google Form Responses)"
