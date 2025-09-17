@@ -5,6 +5,7 @@ import {
 } from "antd";
 import { PrinterOutlined, PlusOutlined, DeleteOutlined } from "@ant-design/icons";
 import ViewSheet from "./ViewSheet";
+import FetchQuot from "./FetchQuot"; // NEW: for fetching saved quotations
 
 
 /* ======================
@@ -20,7 +21,10 @@ const ENTRY = {
   variant: "entry.219611581",
   executive: "entry.1594794173",
   remarks: "entry.1055001846",
+  serial: "entry.606127962",   // <-- NEW (from your link)
+  payload: "entry.26252975",   // <-- matches your link
 };
+
 
 const RESPONSES_CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vRXJ4xTMWJVv7v-U9SD8R5X2z4Lt0EBUeOOo6_leF-75-gToGJV1yxBk3YUooCtMAJ410quZN7UrhnO/pub?output=csv";
@@ -63,7 +67,7 @@ const parseCsv = (text) => {
 
 // Adapter for ViewSheet: CSV text -> { headers, rows }
 const parseCsvForView = (text) => {
-  const rows = parseCsv(text);                 // array[][] from your minimal parser
+  const rows = parseCsv(text);
   if (!rows.length) return { headers: [], rows: [] };
   const headers = rows[0].map((h, i) => h || `Col ${i + 1}`);
   const body = rows.slice(1).map((r) => {
@@ -73,7 +77,6 @@ const parseCsvForView = (text) => {
   });
   return { headers, rows: body };
 };
-
 
 const fetchSheetRowsCSV = async (url) => {
   const res = await fetch(url, { cache: "no-store" });
@@ -110,7 +113,7 @@ const RATE_HIGH = 11;
 
 const EXECUTIVES = [
   { name: "Rukmini", phone: "9901678562" },
-  { name: "Meghana", phone: "7019974219" },
+  { name: "Meghana", phone: "9741609799" },
   { name: "Shubha", phone: "8971585057" },
   { name: "Rani", phone: "9108970455" },
   { name: "Nikitha", phone: "9535190015" },
@@ -200,6 +203,7 @@ const submitToGoogleForm = (entries) => {
 };
 
 const toEntries = (v, executiveName) => ({
+  [ENTRY.serial]: v.serialNo ?? "",  
   [ENTRY.name]: v.name ?? "",
   [ENTRY.phone]: v.mobile ?? "",
   [ENTRY.company]: v.company ?? "",
@@ -247,6 +251,7 @@ const makeEmptyVehicle = () => ({
    ====================== */
 export default function Quotation() {
   const [form] = Form.useForm();
+ 
 
   const [brand, setBrand] = useState("SHANTHA"); // "SHANTHA" | "NH"
 
@@ -254,6 +259,8 @@ export default function Quotation() {
   const [company, setCompany] = useState("");
   const [model, setModel] = useState("");
   const [variant, setVariant] = useState("");
+
+  // keep a mirror for EMI math
   const [onRoadPrice, setOnRoadPrice] = useState(0);
 
   const [manual, setManual] = useState(false);
@@ -502,15 +509,15 @@ export default function Quotation() {
           )
         );
         if (doc.fonts && doc.fonts.ready) { try { await doc.fonts.ready; } catch {
-          //ign
-        } }
+          //ujju
+         } }
         await new Promise(res => setTimeout(res, 200));
       };
 
       await waitForAssets();
       try { win.focus(); } catch {
-        //iih
-      }
+        /* ignore */
+       }
       win.print();
       return;
     }
@@ -560,15 +567,15 @@ export default function Quotation() {
         )
       );
       if (doc.fonts && doc.fonts.ready) { try { await doc.fonts.ready; } catch {
-        //iji
-      } }
+        //
+       } }
       await new Promise(res => setTimeout(res, 200));
     };
 
     try {
       await waitForAssets();
-      try { win.focus(); } catch {
-        //kbj
+      try { win.focus(); } catch { 
+        //gy
       }
       try { win.print(); } catch { window.print(); }
     } finally {
@@ -610,41 +617,63 @@ export default function Quotation() {
       form.setFieldsValue({ serialNo: serial });
     }
 
-  // Build compact Remarks: Company + Model + Variant for each vehicle (V1..V3) + Free Extra Fittings
-const labelOf = (c, m, v) => [c, m, v].filter(Boolean).join(" ");
+    // Build compact Remarks
+    const labelOf = (c, m, vv) => [c, m, vv].filter(Boolean).join(" ");
+    const vehicleLines = [];
+    {
+      const c = v.company || "";
+      const m = v.bikeModel || "";
+      const varnt = v.variant || "";
+      const label = labelOf(c, m, varnt);
+      if (label) vehicleLines.push(`V1: ${label}`);
+    }
+    extraVehicles.forEach((ev, i) => {
+      const label = labelOf(ev.company || "", ev.model || "", ev.variant || "");
+      if (label) vehicleLines.push(`V${i + 2}: ${label}`);
+    });
+    const fittingsLine = Array.isArray(fittings) && fittings.length
+      ? `Fittings: ${Array.from(new Set(fittings.filter(Boolean))).join(", ")}`
+      : "";
+    const mergedRemarks = [
+      String(v.remarks || "").trim(),
+      ...vehicleLines,
+      fittingsLine
+    ].filter(Boolean).join(" | ");
 
-// Vehicles (V1..V3)
-const vehicleLines = [];
-{
-  // V1 (main)
-  const c = v.company || "";
-  const m = v.bikeModel || "";
-  const varnt = v.variant || "";
-  const label = labelOf(c, m, varnt);
-  if (label) vehicleLines.push(`V1: ${label}`);
-}
-// V2..V3 (extra vehicles)
-extraVehicles.forEach((ev, i) => {
-  const label = labelOf(ev.company || "", ev.model || "", ev.variant || "");
-  if (label) vehicleLines.push(`V${i + 2}: ${label}`);
-});
+    // Build payload AFTER we have v and mergedRemarks
+    const payload = {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      brand,                // "SHANTHA" | "NH"
+      mode,                 // "cash" | "loan"
+      vehicleType,          // "scooter" | "motorcycle"
+      fittings,             // array of strings
+      docsReq,              // array of strings
+      emiSet,               // "12" | "48"
+      downPayment,          // number for Vehicle 1
+      onRoadPrice,          // number for Vehicle 1 (mirror state)
+      company,              // Vehicle 1 (mirror states)
+      model,
+      variant,
+      formValues: {
+        serialNo: v.serialNo,
+        name: v.name,
+        mobile: v.mobile,
+        address: v.address,
+        company: v.company,
+        bikeModel: v.bikeModel,
+        variant: v.variant,
+        onRoadPrice: v.onRoadPrice,
+        executive: v.executive,
+        remarks: mergedRemarks,
+      },
+      extraVehicles,        // [{company, model, variant, onRoadPrice, downPayment, emiSet}, ...]
+    };
+    const payloadStr = JSON.stringify(payload);
 
-// Free Extra Fittings
-const fittingsLine = Array.isArray(fittings) && fittings.length
-  ? `Fittings: ${Array.from(new Set(fittings.filter(Boolean))).join(", ")}`
-  : "";
-
-// Merge with any user-typed remarks, separated by " | "
-const mergedRemarks = [
-  String(v.remarks || "").trim(),
-  ...vehicleLines,
-  fittingsLine
-].filter(Boolean).join(" | ");
-
-// Send to Google Form
-const entries = toEntries({ ...v, remarks: mergedRemarks }, executiveName);
-submitToGoogleForm(entries);
-
+    const entries = toEntries({ ...v, remarks: mergedRemarks }, executiveName);
+    entries[ENTRY.payload] = payloadStr;
+    submitToGoogleForm(entries);
     return v;
   };
 
@@ -697,7 +726,6 @@ submitToGoogleForm(entries);
       const varnt1  = (variant || form.getFieldValue("variant")   || "-").trim();
       const price1  = form.getFieldValue("onRoadPrice") ?? onRoadPrice ?? 0;
       const dp1     = downPayment || 0;
-      //const tset1   = tenuresForSet(emiSet);
 
       // V2..V3
       const vehicles = [
@@ -742,6 +770,20 @@ submitToGoogleForm(entries);
         ].join("\n");
       });
 
+      // Add Free Fittings + Documents sections to the message
+      const selectedFittings = Array.isArray(fittings) ? fittings.filter(Boolean) : [];
+      const selectedDocsReq = Array.isArray(docsReq) ? docsReq.filter(Boolean) : [];
+
+      const afterVehicles = [
+        ``,
+        ...(selectedFittings.length
+          ? [`*Free Extra Fittings:*`, ...selectedFittings.map(f => `   ✅ ${f}`)]
+          : []),
+        ...(selectedDocsReq.length
+          ? [``, `*Documents Required:*`, ...selectedDocsReq.map(d => `   📄 ${d}`)]
+          : []),
+      ];
+
       const footer = [
         ``,
         `• *Sales Advisor:* ${executiveName || "-"} (${execPhone})`,
@@ -750,22 +792,7 @@ submitToGoogleForm(entries);
         `✨ *${showroomName} — Ride with Pride, Drive with Confidence.* ✨`
       ];
 
-      // Add Free Fittings + Documents sections to the message
-const selectedFittings = Array.isArray(fittings) ? fittings.filter(Boolean) : [];
-const selectedDocsReq = Array.isArray(docsReq) ? docsReq.filter(Boolean) : [];
-
-const afterVehicles = [
-  ``,
-  ...(selectedFittings.length
-    ? [`*Free Extra Fittings:*`, ...selectedFittings.map(f => `   ✅ ${f}`)]
-    : []),
-  ...(selectedDocsReq.length
-    ? [``, `*Documents Required:*`, ...selectedDocsReq.map(d => `   📄 ${d}`)]
-    : []),
-];
-
-const text = [...header, ...vblocks, ...afterVehicles, ...footer].join("\n");
-
+      const text = [...header, ...vblocks, ...afterVehicles, ...footer].join("\n");
       const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
 
       const w = window.open(url, "_blank", "noopener,noreferrer");
@@ -778,7 +805,7 @@ const text = [...header, ...vblocks, ...afterVehicles, ...footer].join("\n");
 
   const PrintList = ({ items }) => {
     if (!items?.length) return <span>-</span>;
-    return <ul className="plist">{items.map((t) => <li key={t}>{t}</li>)}</ul>;
+    return <ul className="plist">{items.map((t, i) => <li key={`${t}-${i}`}>{t}</li>)}</ul>;
   };
 
   // ---------- Extra Vehicles UI Helpers ----------
@@ -837,6 +864,17 @@ const text = [...header, ...vblocks, ...afterVehicles, ...footer].join("\n");
     setExtraVehicles((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  // Keep local state in sync with Form for fields we mirror (onRoadPrice)
+  const onValuesChange = (_, all) => {
+    if (typeof all?.onRoadPrice !== "undefined") {
+      setOnRoadPrice(Number(all.onRoadPrice || 0));
+      // clamp DP if needed
+      if (downPayment > Number(all.onRoadPrice || 0)) {
+        setDownPayment(Number(all.onRoadPrice || 0));
+      }
+    }
+  };
+
   return (
     <>
       <style>{`
@@ -853,32 +891,67 @@ const text = [...header, ...vblocks, ...afterVehicles, ...footer].join("\n");
       {/* On-screen inputs */}
       <div className="wrap no-print">
         <div className="card">
-             <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end"  }}>
-                   <ViewSheet
-  sheetCsvUrl={RESPONSES_CSV_URL}   // or SHEET_CSV_URL if you want the vehicle data
-  parseCSV={parseCsvForView}
-  dateColumn="Timestamp"
-  buttonProps={{ type: "primary" }}
-  buttonText="View Sheet"
-/>
-</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+         {/* NEW: Fetch saved quotation by Quotation No. or Mobile */}
+       
+       </div>
           <Form
             layout="vertical"
             form={form}
             initialValues={{ executive: EXECUTIVES[0].name }}
+            onValuesChange={onValuesChange}
           >
             <Row gutter={[12, 8]}>
-                
-
-              <Col span={24}>
-        
-                <Form.Item label="Brand on Print">
+                <Col span={24}>
+              <div
+                className="brand-actions-row"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr auto",
+                  alignItems: "center",
+                  gap: 12,
+                }}
+              >
+                <Form.Item label="Brand on Print" style={{ marginBottom: 0 }}>
                   <Radio.Group value={brand} onChange={(e)=>setBrand(e.target.value)}>
                     <Radio value="SHANTHA">Shantha Motors</Radio>
                     <Radio value="NH">NH Motors (Honda)</Radio>
                   </Radio.Group>
                 </Form.Item>
-              </Col>
+                {/* Right-side stacked buttons */}
+                <div className="brand-actions" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <FetchQuot
+                    form={form}
+                    responsesCsvUrl={RESPONSES_CSV_URL}
+                    parseCsv={parseCsv}
+                    EXECUTIVES={EXECUTIVES}
+                    setBrand={setBrand}
+                    setMode={setMode}
+                    setVehicleType={setVehicleType}
+                    setFittings={setFittings}
+                    setDocsReq={setDocsReq}
+                    setEmiSet={setEmiSet}
+                    setDownPayment={setDownPayment}
+                    setOnRoadPrice={setOnRoadPrice}
+                    setCompany={setCompany}
+                    setModel={setModel}
+                    setVariant={setVariant}
+                    setExtraVehicles={setExtraVehicles}
+                    buttonText="Fetch Details"
+                    buttonProps={{
+                      style: { background: "#2ECC71", borderColor: "#2ECC71", color: "#fff" },
+                    }}
+                  />
+                  <ViewSheet
+                    sheetCsvUrl={RESPONSES_CSV_URL}
+                    parseCSV={parseCsvForView}
+                    dateColumn="Timestamp"
+                    buttonText="View Sheet"
+                    buttonProps={{ type: "primary" }}
+                  />
+                </div>
+              </div>
+            </Col>
 
               <Col span={24}>
                 <Form.Item label="Type manually (no sheet)" valuePropName="checked">
@@ -1000,8 +1073,6 @@ const text = [...header, ...vblocks, ...afterVehicles, ...footer].join("\n");
                   <InputNumber
                     style={{ width: "100%" }}
                     readOnly={!manual}
-                    value={onRoadPrice}
-                    onChange={(v)=>setOnRoadPrice(Number(v||0))}
                     formatter={(val) => `₹ ${String(val ?? "0").replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`}
                     parser={(val) => String(val || "0").replace(/[₹,\s]/g, "")}
                   />
@@ -1081,8 +1152,8 @@ const text = [...header, ...vblocks, ...afterVehicles, ...footer].join("\n");
               <Col xs={24}>
                 <Form.Item label="Documents Required (always printed)">
                   <Checkbox.Group value={docsReq} onChange={setDocsReq}>
-                    {DOCS_REQUIRED.map((x) => (
-                      <div key={x} style={{ marginBottom: 6 }}>
+                    {DOCS_REQUIRED.map((x, i) => (
+                      <div key={`${x}-${i}`} style={{ marginBottom: 6 }}>
                         <Checkbox value={x}>{x}</Checkbox>
                       </div>
                     ))}
@@ -1203,7 +1274,6 @@ const text = [...header, ...vblocks, ...afterVehicles, ...footer].join("\n");
                                 parser={(val) => String(val || "0").replace(/[₹,\s]/g, "")}
                               />
                             </Col>
-                            
 
                             <Col xs={24}>
                               <Radio.Group
@@ -1298,106 +1368,106 @@ const text = [...header, ...vblocks, ...afterVehicles, ...footer].join("\n");
               </div>
             </div>
 
-           {/* Brand block */}
-<div
-  style={{
-    borderBottom: "2px solid #000",
-    paddingBottom: 6,
-    marginBottom: 8,
-  }}
->
-  <div
-    className="brand-row2"
-    style={{
-      display: "grid",
-      gridTemplateColumns: "1fr auto",
-      columnGap: 16,
-      alignItems: "center",
-    }}
-  >
-    {/* LEFT: brand names + addresses + mobiles */}
-    <div>
-      {/* Brand names horizontally (smaller than before) */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "baseline",
-          gap: 10,
-          flexWrap: "wrap",
-          marginBottom: 4,
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
-      >
-        {brand === "SHANTHA" ? (
-          <>
-            <div className="title-kn" style={{ fontSize: "25pt", fontWeight: 800 }}>
-              ಶಾಂತ ಮೋಟರ್ಸ್
-            </div>
-            <div className="title-en" style={{ fontSize: "20pt", fontWeight: 800 }}>
-              Shantha Motors
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="title-knhonda" style={{ fontSize: "25pt", fontWeight: 800 }}>
-              ಎನ್ ಎಚ್ ಮೋಟರ್ಸ್
-            </div>
-            <div className="title-en" style={{ fontSize: "18pt", fontWeight: 700 }}>
-              NH Motors
-            </div>
-          </>
-        )}
-      </div>
+            {/* Brand block */}
+            <div
+              style={{
+                borderBottom: "2px solid #000",
+                paddingBottom: 6,
+                marginBottom: 8,
+              }}
+            >
+              <div
+                className="brand-row2"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr auto",
+                  columnGap: 16,
+                  alignItems: "center",
+                }}
+              >
+                {/* LEFT: brand names + addresses + mobiles */}
+                <div>
+                  {/* Brand names horizontally (smaller than before) */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "baseline",
+                      gap: 10,
+                      flexWrap: "wrap",
+                      marginBottom: 4,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {brand === "SHANTHA" ? (
+                      <>
+                        <div className="title-kn" style={{ fontSize: "25pt", fontWeight: 800 }}>
+                          ಶಾಂತ ಮೋಟರ್ಸ್
+                        </div>
+                        <div className="title-en" style={{ fontSize: "20pt", fontWeight: 800 }}>
+                          Shantha Motors
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="title-knhonda" style={{ fontSize: "25pt", fontWeight: 800 }}>
+                          ಎನ್ ಎಚ್ ಮೋಟರ್ಸ್
+                        </div>
+                        <div className="title-en" style={{ fontSize: "18pt", fontWeight: 700 }}>
+                          NH Motors
+                        </div>
+                      </>
+                    )}
+                  </div>
 
-      {/* Addresses + mobile (condensed lines as requested) */}
-      {brand === "SHANTHA" ? (
-        <>
-          <div className="addr-line" style={{ fontSize: "13pt" }}>
-            • Muddinapalya • Hegganahalli   • Nelagadrahalli  • Andrahalli
-          </div>
-          <div className="addr-line" style={{ fontSize: "13pt" }}>
-            • Kadabagere   • Channenahali  • Tavarekere • D-Group Layout
-          </div>
-          <div style={{ marginTop: 6, fontWeight: 600 }}>
-            Mob: 9731366921 / 8073283502 / 9035131806
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="addr-linehonda" style={{ fontSize: "12pt" }}>
-            Site No. 116/1, Bydarahalli, Magadi Main Road, Opp. HP Petrol Bunk, Bangalore - 560091
-          </div>
-          <div style={{ marginTop: 6, fontWeight: 600 }}>
-            Mob: 9731366921 / 8073283502 / 9741609799
-          </div>
-        </>
-      )}
-    </div>
+                  {/* Addresses + mobile (condensed lines as requested) */}
+                  {brand === "SHANTHA" ? (
+                    <>
+                      <div className="addr-line" style={{ fontSize: "13pt" }}>
+                        • Muddinapalya • Hegganahalli   • Nelagadrahalli  • Andrahalli
+                      </div>
+                      <div className="addr-line" style={{ fontSize: "13pt" }}>
+                        • Kadabagere   • Channenahali  • Tavarekere • D-Group Layout
+                      </div>
+                      <div style={{ marginTop: 6, fontWeight: 600 }}>
+                        Mob: 9731366921 / 8073283502 / 9035131806
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="addr-linehonda" style={{ fontSize: "12pt" }}>
+                        Site No. 116/1, Bydarahalli, Magadi Main Road, Opp. HP Petrol Bunk, Bangalore - 560091
+                      </div>
+                      <div style={{ marginTop: 6, fontWeight: 600 }}>
+                        Mob: 9731366921 / 8073283502 / 9741609799
+                      </div>
+                    </>
+                  )}
+                </div>
 
-    {/* RIGHT: logo only */}
-    <div
-      className="brand-right"
-      style={{
-        display: "flex",
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 16,
-        justifyContent: "flex-end",
-      }}
-    >
-      <img
-        src={brand === "SHANTHA" ? "/shantha-logoprint.png" : "/honda-logo.png"}
-        alt="Brand Logo"
-        style={{
-          height: 130, // 80–100px requested; using 100 for clarity
-          objectFit: "contain",
-        }}
-      />
-    </div>
-  </div>
-</div>
+                {/* RIGHT: logo only */}
+                <div
+                  className="brand-right"
+                  style={{
+                    display: "flex",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 16,
+                    justifyContent: "flex-end",
+                  }}
+                >
+                  <img
+                    src={brand === "SHANTHA" ? "/shantha-logoprint.png" : "/honda-logo.png"}
+                    alt="Brand Logo"
+                    style={{
+                      height: 130,
+                      objectFit: "contain",
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
 
             {/* Customer */}
             <div className="box" style={{ marginBottom: 8 }}>
@@ -1449,7 +1519,6 @@ const text = [...header, ...vblocks, ...afterVehicles, ...footer].join("\n");
               </div>
             )}
 
-           
             {/* Extra Vehicles blocks on print */}
             {extraVehicles.map((ev, idx) => {
               const idx1 = idx + 2;
@@ -1497,7 +1566,7 @@ const text = [...header, ...vblocks, ...afterVehicles, ...footer].join("\n");
               );
             })}
 
-             {/* Executive + fittings + docs */}
+            {/* Executive + fittings + docs */}
             <div className="box" style={{ marginBottom: 8 }}>
               <div style={{ marginBottom: 6, fontSize: "13pt", fontWeight: 700 }}>
                 <b>Executive name:</b> {executiveName || "-"}
@@ -1542,7 +1611,6 @@ const text = [...header, ...vblocks, ...afterVehicles, ...footer].join("\n");
                 </div>
               </div>
             </div>
-
 
             <div style={{ fontSize: "9.5pt", display: "flex", justifyContent: "space-between" }}>
               <div />
