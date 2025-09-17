@@ -21,6 +21,7 @@ const ENTRY = {
   variant: "entry.219611581",
   executive: "entry.1594794173",
   remarks: "entry.1055001846",
+  branch: "entry.1916584531", // NEW
   serial: "entry.606127962",   // <-- NEW (from your link)
   payload: "entry.26252975",   // <-- matches your link
 };
@@ -127,6 +128,17 @@ const EXECUTIVES = [
   { name: "Kavya", phone: "8073165374" },
   { name: "Vanitha", phone: "9380729861" },
 ];
+const BRANCHES = [
+  "Byadarahalli",
+  "Kadabagere",
+  "Muddinapalya",
+  "D-Group Layout",
+  "Andrahalli",
+  "Tavarekere",
+  "Hegganahalli",
+  "Channenahalli",
+  "Nelagadrahalli",
+];
 
 const SCOOTER_OPTIONS = [
   "All Round Guard",
@@ -213,6 +225,7 @@ const toEntries = (v, executiveName) => ({
   [ENTRY.variant]: v.variant ?? "",
   [ENTRY.executive]: executiveName ?? "",
   [ENTRY.remarks]: v.remarks ?? "",
+  [ENTRY.branch]: v.branch ?? "",       
 });
 
 /* ======================
@@ -668,6 +681,7 @@ export default function Quotation() {
         onRoadPrice: v.onRoadPrice,
         executive: v.executive,
         remarks: mergedRemarks,
+        branch: v.branch || "", 
       },
       extraVehicles,        // [{company, model, variant, onRoadPrice, downPayment, emiSet}, ...]
     };
@@ -702,7 +716,8 @@ export default function Quotation() {
       // Validate essentials before composing the message
       const v = await form.validateFields([
         "serialNo", "name", "mobile",
-        "company", "bikeModel", "variant", "onRoadPrice"
+        "company", "bikeModel", "variant", "onRoadPrice",
+         "executive", "remarks", "branch", 
       ]);
 
       // validate extra vehicles if present
@@ -964,7 +979,7 @@ export default function Quotation() {
                 </Form.Item>
               </Col>
 
-              <Col xs={24} md={8}>
+              <Col xs={24} md={4}>
                 <Form.Item
                   label="Quotation No."
                   name="serialNo"
@@ -973,14 +988,25 @@ export default function Quotation() {
                   <Input placeholder="Auto-filled (1, 2, 3…)" />
                 </Form.Item>
               </Col>
+              {/* NEW: Branch */}
+<Col xs={24} md={6}>
+  <Form.Item label="Branch" name="branch">
+    <Select
+      placeholder="Select branch"
+      options={BRANCHES.map(b => ({ value: b, label: b }))}
+      showSearch
+      optionFilterProp="label"
+    />
+  </Form.Item>
+</Col>
 
-              <Col xs={24} md={8}>
+              <Col xs={24} md={6}>
                 <Form.Item label="Executive Name" name="executive">
                   <Select options={EXECUTIVES.map((e) => ({ value: e.name, label: e.name }))} />
                 </Form.Item>
               </Col>
 
-              <Col xs={24} md={8}>
+              <Col xs={24} md={6}>
                 <Form.Item label="Payment Mode">
                   <Radio.Group optionType="button" buttonStyle="solid" value={mode} onChange={(e)=>setMode(e.target.value)}>
                     <Radio.Button value="cash">Cash</Radio.Button>
