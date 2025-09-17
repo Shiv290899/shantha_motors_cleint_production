@@ -248,15 +248,18 @@ function buildWelcomeMsg(vals, totals) {
   const estimate = inr(totals?.grand ?? 0);
 
   return (
-    `Hi ${name}!\n` +
-    `✅ Your service is booked at Shantha Motors.\n` +
-    `Welcome to Shantha Motors,\n` +
-    `ಶಾಂತಾ ಮೋಟರ್ಸ್‌ಗೆ ಸ್ವಾಗತ.\n\n` +
-    `🧾 JC: ${jc} | 🚘 ${reg}\n` +
-    `📅 Delivery: ${fmtDate}\n` +
-    `💰 ಅಂದಾಜು ವೆಚ್ಚ / Estimate: ${estimate}\n\n` +
-    `ಯಾವುದೇ ಸಹಾಯ ಬೇಕಾದರೆ ಇಲ್ಲಿ ಉತ್ತರಿಸಿ.\n` +
-    `— ${vals?.executive || "Team"}, ${branch}${execPhone ? ` (☎️ ${execPhone})` : ""}`
+  `Hi ${name}! 👋\n\n` +
+`✅ Your bike service is confirmed at Shantha Motors.\n\n` +
+`Welcome to Shantha Motors,\nಶಾಂತ ಮೋಟರ್ಸ್‌ಗೆ ಸ್ವಾಗತ 🏍️✨\n\n` +
+`🧾 Job Card: ${jc}\n` +
+`🏍️ Vehicle: ${reg}\n` +
+`📅 Delivery Date: ${fmtDate}\n` +
+`💰 Estimated Cost (ಅಂದಾಜು ವೆಚ್ಚ): ${estimate}\n\n` +
+`ℹ️ Final prices may vary based on actual service needs.\n\n` +
+`Need any help? Just reply here.\n\n` +
+`— ${vals?.executive || "Team"}, ${branch}${execPhone ? ` (☎️ ${execPhone})` : ""}`
+
+
   );
 }
 
