@@ -138,6 +138,51 @@ const BRANCHES = [
   "Nelagadrahalli",
 ];
 
+/* ======================
+   SERIAL NUMBER (SEQUENTIAL) FROM SHEET
+   ====================== */
+
+// Find the "Quotation No" column in sheet headers
+const findSerialIdx = (header = []) => {
+  const rx = /^(quotation\s*no\.?|quotation\s*number|serial\s*no\.?|serial|quote\s*id)$/i;
+  let idx = header.findIndex((h) => rx.test(String(h || "").trim()));
+  if (idx >= 0) return idx;
+  idx = header.findIndex((h) => /serial/i.test(String(h || "")));
+  return idx >= 0 ? idx : -1;
+};
+
+const parseIntStrict = (s) => {
+  const t = String(s || "").trim();
+  return /^\d+$/.test(t) ? parseInt(t, 10) : null;
+};
+
+// Fast: scan from bottom; if none numeric, compute max; if still none, start at 1
+async function fetchNextSerialNumber() {
+  const res = await fetch(RESPONSES_CSV_URL, { cache: "no-store" });
+  if (!res.ok) throw new Error("Could not fetch responses sheet");
+  const csv = await res.text();
+  const rows = parseCsv(csv);
+  if (!rows.length) return "1";
+
+  const header = rows[0] || [];
+  const idx = findSerialIdx(header);
+  if (idx < 0) return "1";
+
+  // Scan from bottom to find the latest numeric serial quickly
+  for (let i = rows.length - 1; i >= 1; i--) {
+    const n = parseIntStrict(rows[i][idx]);
+    if (n !== null && Number.isFinite(n)) return String(n + 1);
+  }
+
+  // Fallback: compute max among numerics
+  let max = 0;
+  for (let i = 1; i < rows.length; i++) {
+    const n = parseIntStrict(rows[i][idx]);
+    if (n !== null && n > max) max = n;
+  }
+  return String(max + 1 || 1);
+}
+
 const SCOOTER_OPTIONS = [
   "All Round Guard",
   "Side Stand",
@@ -225,27 +270,6 @@ const toEntries = (v, executiveName) => ({
   [ENTRY.remarks]: v.remarks ?? "",
   [ENTRY.branch]: v.branch ?? "",
 });
-
-/* ======================
-   AUTO SERIAL NUMBER
-   ====================== */
-async function getNextSerial() {
-  if (RESPONSES_CSV_URL) {
-    try {
-      const res = await fetch(RESPONSES_CSV_URL, { cache: "no-store" });
-      if (res.ok) {
-        const csv = await res.text();
-        const rows = parseCsv(csv);
-        const count = Math.max(0, rows.length - 1);
-        return String(count + 1);
-      }
-    } catch { /* fallback */ }
-  }
-  const key = `SM_QUOTE_COUNTER_SIMPLE`;
-  const current = Number(localStorage.getItem(key) || "0") + 1;
-  localStorage.setItem(key, String(current));
-  return String(current);
-}
 
 /* ======================
    SMALL UTIL FOR VEHICLE RECORDS
@@ -340,15 +364,6 @@ export default function Quotation() {
   }, [msgApi]);
 
   useEffect(() => {
-    (async () => {
-      const serial = await getNextSerial();
-      if (!form.getFieldValue("serialNo")) {
-        form.setFieldsValue({ serialNo: serial });
-      }
-    })();
-  }, [form]);
-
-  useEffect(() => {
     if (brand === "NH") {
       form.setFieldsValue({ executive: MEGHANA_NAME });
     }
@@ -398,7 +413,7 @@ export default function Quotation() {
   const monthlyFor = (price, dp, months) => {
     const principalBase = Math.max(Number(price || 0) - Number(dp || 0), 0);
     const principal = principalBase + PROCESSING_FEE;
-    const years = months / 12;
+       const years = months / 12;
     const rate = rateFor(price, dp);
     const totalInterest = principal * (rate / 100) * years;
     const total = principal + totalInterest;
@@ -519,14 +534,14 @@ export default function Quotation() {
             )
           );
           if (doc.fonts && doc.fonts.ready) { try { await doc.fonts.ready; } catch {
-            //ksjdf
+            //kjhdsif
           } }
           await new Promise((res) => setTimeout(res, 200));
         };
 
         await waitForAssets();
         try { win.focus(); } catch {
-          //lkhfj
+          //kjshf
         }
         win.print();
         return;
@@ -577,7 +592,7 @@ export default function Quotation() {
           )
         );
         if (doc.fonts && doc.fonts.ready) { try { await doc.fonts.ready; } catch {
-          //jsehfi
+          //jsdhf
         } }
         await new Promise((res) => setTimeout(res, 200));
       };
@@ -585,7 +600,7 @@ export default function Quotation() {
       try {
         await waitForAssets();
         try { win.focus(); } catch {
-          //jhafg
+          //jsf
         }
         try { win.print(); } catch { window.print(); }
       } finally {
@@ -611,10 +626,24 @@ export default function Quotation() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []); // handlePrint uses stable inner functions/values
 
+  // Keep local state in sync with Form for fields we mirror (onRoadPrice)
+  const onValuesChange = (_, all) => {
+    if (typeof all?.onRoadPrice !== "undefined") {
+      setOnRoadPrice(Number(all.onRoadPrice || 0));
+      if (downPayment > Number(all.onRoadPrice || 0)) {
+        setDownPayment(Number(all.onRoadPrice || 0));
+      }
+    }
+  };
+
+  /* ======================
+     SAVE -> ASSIGN NEXT SERIAL -> SUBMIT
+     ====================== */
   const handleSaveToForm = async () => {
+    // Do NOT require serialNo; we're going to assign it now
     const v = await form.validateFields([
-      "serialNo", "name", "mobile", "address",
-      "company", "bikeModel", "variant", "onRoadPrice", "executive", "remarks",
+      "name", "mobile", "address",
+      "company", "bikeModel", "variant", "onRoadPrice", "executive", "remarks", "branch",
     ]);
 
     // validate extra vehicles if present
@@ -625,11 +654,16 @@ export default function Quotation() {
       }
     }
 
-    if (!v.serialNo) {
-      const serial = await getNextSerial();
-      v.serialNo = serial;
-      form.setFieldsValue({ serialNo: serial });
+    // Always fetch next serial from sheet and assign
+    let nextSerial;
+    try {
+      nextSerial = await fetchNextSerialNumber();
+    } catch (err) {
+      message.error("Couldn't fetch last quotation number. Please try again.");
+      throw err;
     }
+    v.serialNo = nextSerial;
+    form.setFieldsValue({ serialNo: nextSerial });
 
     // Build compact Remarks
     const labelOf = (c, m, vv) => [c, m, vv].filter(Boolean).join(" ");
@@ -689,7 +723,7 @@ export default function Quotation() {
     const entries = toEntries(
       {
         ...v,
-        branch: v.branch ?? form.getFieldValue("branch"), // <- ensure present
+        branch: v.branch ?? form.getFieldValue("branch"),
         remarks: mergedRemarks,
       },
       executiveName
@@ -709,7 +743,7 @@ export default function Quotation() {
 
   const handleWhatsAppClick = async () => {
     try {
-      // validate + save first
+      // validate + save first (will assign serial)
       await safeAutoSave();
       await toastSaved("Saved successfully. Opening WhatsApp…");
 
@@ -786,10 +820,10 @@ export default function Quotation() {
       const footer = [
         ``,
         `• *Sales Executive:* ${executiveName || "-"} (${execPhone})`,
-         `*Our Locations* 📍`,
-  `Muddinapalya • Hegganahalli • Nelagadrahalli • Andrahalli`,
-  `Kadabagere • Channenahalli • Tavarekere • D-Group Layout`,
-  ``,
+        `*Our Locations* 📍`,
+        `Muddinapalya • Hegganahalli • Nelagadrahalli • Andrahalli`,
+        `Kadabagere • Channenahalli • Tavarekere • D-Group Layout`,
+        ``,
         `• *Note:* Prices are indicative and may change without prior notice.`,
         ``,
         `✨ *${showroomName} — Ride with Pride, Drive with Confidence.* ✨`
@@ -860,16 +894,6 @@ export default function Quotation() {
 
   const removeVehicle = (idx) => {
     setExtraVehicles((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  // Keep local state in sync with Form for fields we mirror (onRoadPrice)
-  const onValuesChange = (_, all) => {
-    if (typeof all?.onRoadPrice !== "undefined") {
-      setOnRoadPrice(Number(all.onRoadPrice || 0));
-      if (downPayment > Number(all.onRoadPrice || 0)) {
-        setDownPayment(Number(all.onRoadPrice || 0));
-      }
-    }
   };
 
   return (
@@ -959,27 +983,17 @@ export default function Quotation() {
                 </Form.Item>
               </Col>
 
-              <Col xs={24} md={4}>
+              {/* Quotation No. + Branch */}
+             
+              <Col xs={24} md={8}>
                 <Form.Item
                   label="Quotation No."
                   name="serialNo"
-                  rules={[{ required: true, message: "Enter quotation no." }]}
                 >
-                  <Input placeholder="Auto-filled (1, 2, 3…)" />
+                  <Input placeholder="Auto at save" readOnly />
                 </Form.Item>
               </Col>
-
-              {/* NEW: Branch */}
-              <Col xs={24} md={6}>
-                <Form.Item label="Branch" name="branch">
-                  <Select
-                    placeholder="Select branch"
-                    options={BRANCHES.map(b => ({ value: b, label: b }))}
-                    showSearch
-                    optionFilterProp="label"
-                  />
-                </Form.Item>
-              </Col>
+              
 
               <Col xs={24} md={6}>
                 <Form.Item label="Executive Name" name="executive">
@@ -987,7 +1001,7 @@ export default function Quotation() {
                 </Form.Item>
               </Col>
 
-              <Col xs={24} md={6}>
+              <Col xs={24} md={4}>
                 <Form.Item label="Payment Mode">
                   <Radio.Group optionType="button" buttonStyle="solid" value={mode} onChange={(e)=>setMode(e.target.value)}>
                     <Radio.Button value="cash">Cash</Radio.Button>
