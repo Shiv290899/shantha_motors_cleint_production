@@ -990,7 +990,7 @@ export default function Quotation() {
                   label="Quotation No."
                   name="serialNo"
                 >
-                  <Input placeholder="Auto at save" readOnly />
+                  <Input placeholder="No Need to Enter" readOnly />
                 </Form.Item>
               </Col>
               
