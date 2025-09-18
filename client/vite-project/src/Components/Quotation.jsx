@@ -216,6 +216,7 @@ const submitToGoogleForm = (entries) => {
   setTimeout(() => { form.remove(); iframe.remove(); }, 3000);
 };
 
+
 const toEntries = (v, executiveName) => ({
   [ENTRY.serial]: v.serialNo ?? "",  
   [ENTRY.name]: v.name ?? "",
@@ -274,6 +275,16 @@ export default function Quotation() {
   const [company, setCompany] = useState("");
   const [model, setModel] = useState("");
   const [variant, setVariant] = useState("");
+
+   const [lastSavedAt, setLastSavedAt] = useState(0);
+
+  const safeAutoSave = async () => {
+    const now = Date.now();
+    if (now - lastSavedAt < 10000) return; // skip if last save was <10s ago
+    const v = await handleSaveToForm();   // validates + saves
+    setLastSavedAt(now);
+    return v;
+  };
 
   // keep a mirror for EMI math
   const [onRoadPrice, setOnRoadPrice] = useState(0);
@@ -408,23 +419,14 @@ export default function Quotation() {
 
   // ---------- Android-proof A4 print ----------
   const handlePrint = async () => {
-    try {
-      await form.validateFields([
-        "serialNo", "name", "mobile", "address",
-        "company", "bikeModel", "variant", "onRoadPrice",
-        "executive", "remarks", "branch",   // <- add branch
-      ]);
-      // validate extra vehicles if present
-      for (let i = 0; i < extraVehicles.length; i++) {
-        const v = extraVehicles[i];
-        if (!v.company || !v.model || !v.variant || !v.onRoadPrice) {
-          throw new Error(`Please complete Vehicle ${i + 2} details before printing.`);
-        }
-      }
-    } catch (e) {
-      message.warning(e?.message || "Fix the highlighted fields before printing.");
-      return;
-    }
+   // Auto-save (also validates + assigns serial)
+   try {
+    await safeAutoSave();
+     message.success("Saved automatically. Preparing print…");
+   } catch (e) {
+     message.warning(e?.message || "Fix the highlighted fields before printing.");
+     return;
+   }
 
     const page = pageRef.current;
     if (!page) { window.print(); return; }
@@ -700,17 +702,6 @@ export default function Quotation() {
     submitToGoogleForm(entries);
     return v;
   };
-
-  const handleSaveClick = async () => {
-    try {
-      await handleSaveToForm();
-      message.success("Saved successfully.");
-    } catch (err) {
-      console.warn("Save failed:", err);
-      message.error(err?.message || "Could not save. Please check required fields and try again.");
-    }
-  };
-
   // --------- WhatsApp deep-link ----------
   const toE164NoPlusIndia = (raw) => {
     const digits = String(raw || "").replace(/\D/g, "").replace(/^0+/, "");
@@ -719,22 +710,13 @@ export default function Quotation() {
     return "";
   };
 
-  const handleWhatsAppClick = async () => {
-    try {
-      // Validate essentials before composing the message
-      const v = await form.validateFields([
-        "serialNo", "name", "mobile",
-        "company", "bikeModel", "variant", "onRoadPrice",
-         "executive", "remarks", "branch", 
-      ]);
-
-      // validate extra vehicles if present
-      for (let i = 0; i < extraVehicles.length; i++) {
-        const ev = extraVehicles[i];
-        if (!ev.company || !ev.model || !ev.variant || !ev.onRoadPrice) {
-          throw new Error(`Please complete Vehicle ${i + 2} before WhatsApp.`);
-        }
-      }
+   const handleWhatsAppClick = async () => {
+   try {
+     // Auto-save (also validates + assigns serial)
+     await safeAutoSave();
+     message.success("Saved automatically. Opening WhatsApp…");
+     // After save, safely use current values
+     const v = form.getFieldsValue(true);
 
       const phone = toE164NoPlusIndia(v.mobile);
       if (!phone) {
@@ -1352,15 +1334,6 @@ export default function Quotation() {
 
               {/* Actions */}
               <Col span={24} style={{ textAlign: "right" }}>
-                <Button
-                  className="no-print"
-                  onClick={handleSaveClick}
-                  style={{ marginRight: 8 }}
-                  type="default"
-                >
-                  Save
-                </Button>
-
                 <Button
                   className="no-print"
                   onClick={handleWhatsAppClick}
