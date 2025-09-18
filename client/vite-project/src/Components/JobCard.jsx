@@ -12,7 +12,6 @@ import PostServiceSheet from "./PostServiceSheet";
 import FetchJobcard from "./FetchJobcard";
 import ViewSheet from "./ViewSheet";
 
-
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
 const { Option } = Select;
@@ -50,7 +49,6 @@ const GFORM_ENTRY = {
   amount:              "entry.1599026863",  // Collected Amount
   jcNo:                "entry.262964623",   // JC No.
 };
-
 
 // Branches
 const BRANCHES = [
@@ -213,10 +211,10 @@ function autoSubmitToGoogle(entries) {
   // Clean up
   setTimeout(() => {
     try { document.body.removeChild(form); } catch {
-      //igor
+      // ignore
     }
     try { document.body.removeChild(iframe); } catch {
-      //oghnor
+      // ignore
     }
   }, 2000);
 }
@@ -248,18 +246,16 @@ function buildWelcomeMsg(vals, totals) {
   const estimate = inr(totals?.grand ?? 0);
 
   return (
-  `Hi ${name}! 👋\n\n` +
-`✅ Your bike service is confirmed at Shantha Motors.\n\n` +
-`Welcome to Shantha Motors,\nಶಾಂತ ಮೋಟರ್ಸ್‌ಗೆ ಸ್ವಾಗತ 🏍️✨\n\n` +
-`🧾 Job Card: ${jc}\n` +
-`🏍️ Vehicle: ${reg}\n` +
-`📅 Delivery Date: ${fmtDate}\n` +
-`💰 Estimated Cost (ಅಂದಾಜು ವೆಚ್ಚ): ${estimate}\n\n` +
-`ℹ️ Final prices may vary based on actual service needs.\n\n` +
-`Need any help? Just reply here.\n\n` +
-`— ${vals?.executive || "Team"}, ${branch}${execPhone ? ` (☎️ ${execPhone})` : ""}`
-
-
+    `Hi ${name}! 👋\n\n` +
+    `✅ Your bike service is confirmed at Shantha Motors.\n\n` +
+    `Welcome to Shantha Motors,\nಶಾಂತ ಮೋಟರ್ಸ್‌ಗೆ ಸ್ವಾಗತ 🏍️✨\n\n` +
+    `🧾 Job Card: ${jc}\n` +
+    `🏍️ Vehicle: ${reg}\n` +
+    `📅 Delivery Date: ${fmtDate}\n` +
+    `💰 Estimated Cost (ಅಂದಾಜು ವೆಚ್ಚ): ${estimate}\n\n` +
+    `ℹ️ Final prices may vary based on actual service needs.\n\n` +
+    `Need any help? Just reply here.\n\n` +
+    `— ${vals?.executive || "Team"}, ${branch}${execPhone ? ` (☎️ ${execPhone})` : ""}`
   );
 }
 
@@ -413,18 +409,15 @@ export default function JobCard() {
   // ---- Auto Save (→ Google Form) ----
   const fmtDDMMYYYY = (d) => (d ? dayjs(d).format("DD/MM/YYYY") : "");
   // Use the same separator everywhere for obs round-trip
-const OBS_SEP = " # ";
-
+  const OBS_SEP = " # ";
 
   const handleAutoSave = async () => {
     try {
+      // Validate required fields before save
       await form.validateFields(["custName", "custMobile", "branch", "mechanic"]);
 
       const vals = form.getFieldsValue(true);
-     
 
-
-      //const vehOrServiceTypeValue = vals.vehicleType || vals.serviceType || "";
       const amt = Number.isFinite(totals.grand) ? Math.round(totals.grand) : 0;
       const kmOnlyDigits = String(vals.km || "").replace(/\D/g, "");
       const floorMatStr =
@@ -435,46 +428,44 @@ const OBS_SEP = " # ";
           : vals.floorMat === false
           ? "No"
           : "No";
-       const obsOneLine =
-  String(vals.obs || "")
-    // collapse any newline (and surrounding spaces) to our separator
-    .replace(/\s*\r?\n\s*/g, OBS_SEP)
-    // trim any accidental leading/trailing separators or spaces
-    .replace(new RegExp(`^(?:\\s*${OBS_SEP}\\s*)+|(?:\\s*${OBS_SEP}\\s*)+$`, "g"), "")
-    .trim();
+      const obsOneLine =
+        String(vals.obs || "")
+          .replace(/\s*\r?\n\s*/g, OBS_SEP)
+          .replace(new RegExp(`^(?:\\s*${OBS_SEP}\\s*)+|(?:\\s*${OBS_SEP}\\s*)+$`, "g"), "")
+          .trim();
 
       const entries = {
-  [GFORM_ENTRY.branch]:        vals.branch || "",
-  [GFORM_ENTRY.mechanic]:      vals.mechanic || "",
-  [GFORM_ENTRY.executive]:     vals.executive || "",
-  [GFORM_ENTRY.expectedDelivery]: fmtDDMMYYYY(vals.expectedDelivery),
-  [GFORM_ENTRY.regNo]:         vals.regNo || "",
-  [GFORM_ENTRY.model]:         vals.model || "",
-  [GFORM_ENTRY.colour]:        vals.colour || "",
-  [GFORM_ENTRY.km]:            kmOnlyDigits || "",
-  [GFORM_ENTRY.custName]:      vals.custName || "",
-  [GFORM_ENTRY.custMobile]:    String(vals.custMobile || ""),
-  [GFORM_ENTRY.obs]:           obsOneLine,
-  [GFORM_ENTRY.vehicleType]:   vals.vehicleType || "",
-  [GFORM_ENTRY.serviceType]:   vals.serviceType || "",   // ✅ now included
-  [GFORM_ENTRY.floorMat]:      floorMatStr,
-  [GFORM_ENTRY.amount]:        String(amt),
-  [GFORM_ENTRY.jcNo]:          vals.jcNo || "",
-};
-
+        [GFORM_ENTRY.branch]:        vals.branch || "",
+        [GFORM_ENTRY.mechanic]:      vals.mechanic || "",
+        [GFORM_ENTRY.executive]:     vals.executive || "",
+        [GFORM_ENTRY.expectedDelivery]: fmtDDMMYYYY(vals.expectedDelivery),
+        [GFORM_ENTRY.regNo]:         vals.regNo || "",
+        [GFORM_ENTRY.model]:         vals.model || "",
+        [GFORM_ENTRY.colour]:        vals.colour || "",
+        [GFORM_ENTRY.km]:            kmOnlyDigits || "",
+        [GFORM_ENTRY.custName]:      vals.custName || "",
+        [GFORM_ENTRY.custMobile]:    String(vals.custMobile || ""),
+        [GFORM_ENTRY.obs]:           obsOneLine,
+        [GFORM_ENTRY.vehicleType]:   vals.vehicleType || "",
+        [GFORM_ENTRY.serviceType]:   vals.serviceType || "",
+        [GFORM_ENTRY.floorMat]:      floorMatStr,
+        [GFORM_ENTRY.amount]:        String(amt),
+        [GFORM_ENTRY.jcNo]:          vals.jcNo || "",
+      };
 
       autoSubmitToGoogle(entries);
 
       message.loading({ content: "Auto-saving to Google Sheet…", key: "autosave" });
-      setTimeout(() => {
-        message.success({
-          content: "All fields saved to Google Sheet via Google Form.",
-          key: "autosave",
-          duration: 2,
-        });
-      }, 1200);
-    } catch {
+      await new Promise((res) => setTimeout(res, 1200));
+      message.success({
+        content: "All fields saved to Google Sheet via Google Form.",
+        key: "autosave",
+        duration: 2,
+      });
+    } catch (e) {
       message.error("Please complete required fields before auto-saving.");
+      // Re-throw so callers (WhatsApp/Pre-service) can block the action when invalid
+      throw e;
     }
   };
 
@@ -487,10 +478,16 @@ const OBS_SEP = " # ";
     ...(vals?.obs ? vals.obs.split("\n").map((s) => s.trim()).filter(Boolean) : []),
   ];
 
+  // --- Auto-save then WhatsApp ---
   const handleShareWhatsApp = async () => {
     try {
-      await form.validateFields(["custName", "custMobile", "branch"]);
+      // Auto-save first (will throw if validation fails)
+      await handleAutoSave();
+
+      // Re-read values (post-save) to build the message
       const valsNow = form.getFieldsValue(true);
+      await form.validateFields(["custName", "custMobile", "branch"]);
+
       const mobileE164 = normalizeINPhone(valsNow.custMobile);
       if (!mobileE164) {
         message.error("Enter a valid 10-digit mobile number (India).");
@@ -513,48 +510,55 @@ const OBS_SEP = " # ";
         message.success({ key: "share", content: "Ready to send.", duration: 2 });
       }, 800);
     } catch {
-      message.error("Please complete required fields (Name, Mobile, Branch).");
+      // validation error already shown
     }
   };
 
-  //const serviceValueForUI = serviceTypeLocal ? [serviceTypeLocal] : [];
+  // --- Auto-save then Pre-service print ---
+  const handlePreService = async () => {
+    try {
+      await handleAutoSave(); // will throw if invalid
+      await handlePrint("pre");
+    } catch {
+      // validation error already shown
+    }
+  };
 
   return (
     <div style={{ padding: screens.xs ? 8 : 16 }}>
       {/* Screen UI (hidden when printing) */}
       <div className="no-print">
         <Card size="small" bordered>
-  <div style={{  display: "flex", justifyContent: "space-between", alignItems: "centre", gap: 8 }}>
-    <div>
-      <Title level={4} style={{ margin: 0 }}>SHANTHA MOTORS — JOB CARD</Title>
-      <Text type="secondary">Multi Brand Two Wheeler Sales & Service</Text>
-    </div>
-  <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
-    {/* Add the FetchJobcard button */}
-    <FetchJobcard
-      form={form}
-      sheetUrl={SHEET_CSV_URL}              // reuses the published CSV you already have
-      parseCSV={parseCSV}                   // reuse helper from this file
-      formatReg={formatReg}                 // reuse helper from this file
-      buildRows={buildRows}                 // reuse helper from this file
-      defaultGstLabour={DEFAULT_GST_LABOUR} // reuse constant from this file
-      lists={{ BRANCHES, MECHANIC, EXECUTIVES, VEHICLE_TYPES, SERVICE_TYPES }}
-      setServiceTypeLocal={setServiceTypeLocal}
-      setVehicleTypeLocal={setVehicleTypeLocal}
-      setRegDisplay={setRegDisplay}
-    />
-    
-    <ViewSheet
-   sheetCsvUrl={SHEET_CSV_URL}
-   parseCSV={parseCSV}
-   dateColumn="Timestamp"
-   buttonProps={{ type: "primary" }}
-   buttonText="View Sheet"
- />
- </div>
-  </div>
-</Card>
+          <div style={{  display: "flex", justifyContent: "space-between", alignItems: "centre", gap: 8 }}>
+            <div>
+              <Title level={4} style={{ margin: 0 }}>SHANTHA MOTORS — JOB CARD</Title>
+              <Text type="secondary">Multi Brand Two Wheeler Sales & Service</Text>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+              {/* Fetch button */}
+              <FetchJobcard
+                form={form}
+                sheetUrl={SHEET_CSV_URL}
+                parseCSV={parseCSV}
+                formatReg={formatReg}
+                buildRows={buildRows}
+                defaultGstLabour={DEFAULT_GST_LABOUR}
+                lists={{ BRANCHES, MECHANIC, EXECUTIVES, VEHICLE_TYPES, SERVICE_TYPES }}
+                setServiceTypeLocal={setServiceTypeLocal}
+                setVehicleTypeLocal={setVehicleTypeLocal}
+                setRegDisplay={setRegDisplay}
+              />
 
+              <ViewSheet
+                sheetCsvUrl={SHEET_CSV_URL}
+                parseCSV={parseCSV}
+                dateColumn="Timestamp"
+                buttonProps={{ type: "primary" }}
+                buttonText="View Sheet"
+              />
+            </div>
+          </div>
+        </Card>
 
         <Form form={form} layout="vertical" initialValues={initialValues} style={{ marginTop: 12 }}>
           {/* Job Details */}
@@ -713,9 +717,9 @@ const OBS_SEP = " # ";
               </Col>
 
               <Col xs={24}>
-                 <Form.Item label="Customer Observation (additional notes)" name="obs">
-  <Input.TextArea rows={3} placeholder="Write the customer's observations..." />
-</Form.Item>
+                <Form.Item label="Customer Observation (additional notes)" name="obs">
+                  <Input.TextArea rows={3} placeholder="Write the customer's observations..." />
+                </Form.Item>
               </Col>
             </Row>
           </Card>
@@ -769,7 +773,7 @@ const OBS_SEP = " # ";
                   <Form.Item
                     label="Floor Mat (Mandatory)"
                     name="floorMat"
-                    initialValue ="No"
+                    initialValue="No"
                     rules={[{ required: true, message: "Please select Yes/No" }]}
                   >
                     <Segmented
@@ -864,12 +868,8 @@ const OBS_SEP = " # ";
             </div>
           </Card>
 
-          {/* ACTION BUTTONS */}
+          {/* ACTION BUTTONS — Save removed; autosave on WhatsApp / Pre-service */}
           <Row justify="end" style={{ marginTop: 12 }} gutter={8}>
-            <Col>
-              <Button onClick={handleAutoSave}>Save</Button>
-            </Col>
-
             <Col>
               <Button
                 type="default"
@@ -881,10 +881,11 @@ const OBS_SEP = " # ";
             </Col>
 
             <Col>
-              <Button type="primary" onClick={() => handlePrint("pre")}>
+              <Button type="primary" onClick={handlePreService}>
                 Pre-service
               </Button>
             </Col>
+
             <Col>
               <Button onClick={() => handlePrint("post")}>
                 Post-service
