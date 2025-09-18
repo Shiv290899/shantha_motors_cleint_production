@@ -747,74 +747,53 @@ export default function Quotation() {
       const execPhone = (EXECUTIVES.find(e => e.name === executiveName) || {}).phone || "-";
       const qDate = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 
-      // A little flair
-const bikeEmoji = vehicleType === "scooter" ? "🛵" : "🏍️";
-const line = "━━━━━━━━━━━━━━━━━━━━";
+      // Header
+      const header = [
+        `*Hi ${name}, Welcome to ${showroomName}! 🏍️*`,
+        `Multi-brand two-wheeler sales, service, spares, exchange, finance & insurance`,
+        `*Mob No - 9731366921 / 8073283502*`,
+        ``,
+        `• *Quotation Date:* ${qDate}`,
+      ];
 
-// Header
-const header = [
-  `*Hi ${name}*, welcome to *${showroomName}* ${bikeEmoji}`,
-  `_Multi-brand two-wheeler sales, service, spares, exchange, finance & insurance_`,
-  ` *Mob No: 9731366921 / 8073283502*`,
-  line,
-  `*Quotation Date:* ${qDate}`,
-  `*Quotation No.:* ${form.getFieldValue("serialNo") || "-"}`,
-];
+      // Vehicle sections
+      const vblocks = vehicles.map((it) => {
+        const tset = tenuresForSet(it.emiSet);
+        const emiLines = (mode === "loan")
+          ? [
+              `   – Down Payment: ${inr0(it.dp || 0)}`,
+              ...tset.map((mo) => `   – ${mo} months: ${inr0(monthlyFor(it.price, it.dp || 0, mo))}`)
+            ]
+          : [];
+        return [
+          ``,
+          `*${it.title}:*`,
+          `• *Vehicle:* ${it.company} ${it.model} ${it.variant}`,
+          `• *On-Road Price:* ${inr0(it.price)}`,
+          ...(mode === "loan" ? [`• *EMI Options (approx.):*`, ...emiLines] : []),
+        ].join("\n");
+      });
 
-// Vehicle sections
-const vblocks = vehicles.map((it) => {
-  const tset = tenuresForSet(it.emiSet);
-  const emiLines =
-    mode === "loan"
-      ? [
-          `   • Down Payment: ${inr0(it.dp || 0)}`,
-          ...tset.map(
-            (mo) =>
-              `   • ${mo} months: ${inr0(
-                monthlyFor(it.price, it.dp || 0, mo)
-              )}`
-          ),
-        ]
-      : [];
+      // Fittings + Docs
+      const selectedFittings = Array.isArray(fittings) ? fittings.filter(Boolean) : [];
+      const selectedDocsReq = Array.isArray(docsReq) ? docsReq.filter(Boolean) : [];
+      const afterVehicles = [
+        ``,
+        ...(selectedFittings.length ? [`*Free Extra Fittings:*`, ...selectedFittings.map(f => `   ✅ ${f}`)] : []),
+        ...(selectedDocsReq.length ? [``, `*Documents Required:*`, ...selectedDocsReq.map(d => `   📄 ${d}`)] : []),
+      ];
 
-  const titleEmoji = bikeEmoji; // same emoji for all vehicles; customize if you like
-  return [
-    ``,
-    `*${it.title}* ${titleEmoji}`,
-    `• *Vehicle:* ${it.company} ${it.model}${it.variant ? ` (${it.variant})` : ""}`,
-    `• *On-Road Price:* ${inr0(it.price)}`,
-    ...(mode === "loan" ? [`• *EMI Options* 💳`, ...emiLines] : []),
-    line,
-  ].join("\n");
-});
-
-// Fittings + Docs
-const selectedFittings = Array.isArray(fittings) ? fittings.filter(Boolean) : [];
-const selectedDocsReq = Array.isArray(docsReq) ? docsReq.filter(Boolean) : [];
-
-const afterVehicles = [
-  ``,
-  ...(selectedFittings.length
-    ? [`*Free Fittings* 🎁`, ...selectedFittings.map((f) => `   • ${f}`)]
-    : []),
-  ...(selectedDocsReq.length
-    ? [``, `*Documents Required* 🧾`, ...selectedDocsReq.map((d) => `   • ${d}`)]
-    : []),
-];
-
-// Footer
-const footer = [
-  ``,
-  `*Sales Executive:* ${executiveName || "-"} — ${execPhone}`,
-  ``,
-  `*Our Locations* 📍`,
+      const footer = [
+        ``,
+        `• *Sales Executive:* ${executiveName || "-"} (${execPhone})`,
+         `*Our Locations* 📍`,
   `Muddinapalya • Hegganahalli • Nelagadrahalli • Andrahalli`,
   `Kadabagere • Channenahalli • Tavarekere • D-Group Layout`,
-  line,
-  `Reply with *YES* to proceed or ask me anything.`,
-  `✨ *${showroomName} — Ride with Pride, Drive with Confidence.* ✨`,
-];
-
+  ``,
+        `• *Note:* Prices are indicative and may change without prior notice.`,
+        ``,
+        `✨ *${showroomName} — Ride with Pride, Drive with Confidence.* ✨`
+      ];
 
       const text = [...header, ...vblocks, ...afterVehicles, ...footer].join("\n");
       const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
