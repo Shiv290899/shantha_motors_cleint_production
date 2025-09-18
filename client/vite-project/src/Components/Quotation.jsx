@@ -990,7 +990,17 @@ export default function Quotation() {
                   label="Quotation No."
                   name="serialNo"
                 >
-                  <Input placeholder="No Need to Enter" readOnly />
+                  <Input placeholder="Auto at save" readOnly />
+                </Form.Item>
+              </Col>
+               <Col xs={24} md={6}>
+                <Form.Item label="Branch" name="branch" rules={[{ required: true, message: "Select branch" }]}>
+                  <Select
+                    placeholder="Select branch"
+                    options={BRANCHES.map(b => ({ value: b, label: b }))}
+                    showSearch
+                    optionFilterProp="label"
+                  />
                 </Form.Item>
               </Col>
               
