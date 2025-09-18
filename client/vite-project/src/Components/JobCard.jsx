@@ -133,21 +133,50 @@ function parseCSV(text) {
   return { headers, rows };
 }
 
-async function getNextJobCardNo() {
-  if (SHEET_CSV_URL) {
-    try {
-      const res = await fetch(SHEET_CSV_URL, { cache: "no-store" });
-      if (res.ok) {
-        const csv = await res.text();
-        const { rows } = parseCSV(csv);
-        const count = Math.max(0, rows.length);
-        return String(count + 1);
+// ---- JC No. helpers (save-time serial) ----
+const JC_HEADER_RX =
+  /^(jc\s*no\.?|jc\s*number|job\s*card\s*no\.?|job\s*card\s*number|serial(?:\s*no\.?)?)$/i;
+
+const parseIntStrict = (s) => {
+  const t = String(s || "").trim();
+  return /^\d+$/.test(t) ? parseInt(t, 10) : null;
+};
+
+function findJCHeader(headers = []) {
+  return headers.find((h) => JC_HEADER_RX.test(String(h || "").trim())) || null;
+}
+
+/** Fast: scan sheet bottom-up for last numeric JC No, return last+1. */
+async function fetchNextJobCardSerial() {
+  try {
+    const res = await fetch(SHEET_CSV_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error("Fetch failed");
+    const csv = await res.text();
+    const { headers, rows } = parseCSV(csv);
+    if (!rows.length) return "1";
+
+    const col = findJCHeader(headers);
+    if (col) {
+      // bottom-up first hit
+      for (let i = rows.length - 1; i >= 0; i--) {
+        const n = parseIntStrict(rows[i][col]);
+        if (n !== null) return String(n + 1);
       }
-    } catch {
-      // ignore
+      // fallback: max numeric
+      let max = 0;
+      for (let i = 0; i < rows.length; i++) {
+        const n = parseIntStrict(rows[i][col]);
+        if (n !== null && n > max) max = n;
+      }
+      return String(max + 1 || 1);
     }
+
+    // No JC column detected → fallback to row count
+    return String(rows.length + 1);
+  } catch {
+    // If CSV not reachable, fallback to timestamp-like serial
+    return dayjs().format("YYMMDDHHmmss");
   }
-  return dayjs().format("YYMMDDHHmmss");
 }
 
 /* Vehicle No. mask - KA05 DB 6000 */
@@ -211,10 +240,10 @@ function autoSubmitToGoogle(entries) {
   // Clean up
   setTimeout(() => {
     try { document.body.removeChild(form); } catch {
-      // ignore
+      //kljnsfjg
     }
     try { document.body.removeChild(iframe); } catch {
-      // ignore
+    //klhf
     }
   }, 2000);
 }
@@ -327,14 +356,7 @@ export default function JobCard() {
     []
   );
 
-  useEffect(() => {
-    (async () => {
-      const next = await getNextJobCardNo();
-      form.setFieldsValue({ jcNo: next });
-      message.success(`JC No. set to ${next}`);
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // NOTE: removed "set JC No. on mount" — we now assign at save-time only.
 
   const handleRegChange = (e) => {
     const next = formatReg(e.target.value);
@@ -413,10 +435,19 @@ export default function JobCard() {
 
   const handleAutoSave = async () => {
     try {
-      // Validate required fields before save
+      // Validate required fields before save (JC No. will be assigned below)
       await form.validateFields(["custName", "custMobile", "branch", "mechanic"]);
 
       const vals = form.getFieldsValue(true);
+
+      // 🔢 Ensure a fresh sequential JC No. at save-time.
+      // If jcNo is missing or non-numeric, fetch next from sheet and set it.
+      let jc = vals.jcNo;
+      if (!/^\d+$/.test(String(jc || "").trim())) {
+        jc = await fetchNextJobCardSerial();
+        form.setFieldsValue({ jcNo: jc });
+        message.success(`JC No. assigned: ${jc}`);
+      }
 
       const amt = Number.isFinite(totals.grand) ? Math.round(totals.grand) : 0;
       const kmOnlyDigits = String(vals.km || "").replace(/\D/g, "");
@@ -450,7 +481,7 @@ export default function JobCard() {
         [GFORM_ENTRY.serviceType]:   vals.serviceType || "",
         [GFORM_ENTRY.floorMat]:      floorMatStr,
         [GFORM_ENTRY.amount]:        String(amt),
-        [GFORM_ENTRY.jcNo]:          vals.jcNo || "",
+        [GFORM_ENTRY.jcNo]:          jc, // ✅ save-time serial
       };
 
       autoSubmitToGoogle(entries);
@@ -566,7 +597,7 @@ export default function JobCard() {
             <Row gutter={12}>
               <Col xs={12} sm={2}>
                 <Form.Item label="JC No." name="jcNo" rules={[{ required: true }]}>
-                  <Input />
+                  <Input placeholder="No Need to Enter" readOnly />
                 </Form.Item>
               </Col>
 
