@@ -7,7 +7,6 @@ import { PrinterOutlined, PlusOutlined, DeleteOutlined } from "@ant-design/icons
 import ViewSheet from "./ViewSheet";
 import FetchQuot from "./FetchQuot"; // NEW: for fetching saved quotations
 
-
 /* ======================
    GOOGLE FORM INTEGRATION
    ====================== */
@@ -21,11 +20,10 @@ const ENTRY = {
   variant: "entry.219611581",
   executive: "entry.1594794173",
   remarks: "entry.1055001846",
-  branch: "entry.1916584531", // NEW
-  serial: "entry.606127962",   // <-- NEW (from your link)
-  payload: "entry.26252975",   // <-- matches your link
+  branch: "entry.1916584531",
+  serial: "entry.606127962",
+  payload: "entry.26252975",
 };
-
 
 const RESPONSES_CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vRXJ4xTMWJVv7v-U9SD8R5X2z4Lt0EBUeOOo6_leF-75-gToGJV1yxBk3YUooCtMAJ410quZN7UrhnO/pub?output=csv";
@@ -66,7 +64,7 @@ const parseCsv = (text) => {
   return rows;
 };
 
-// Adapter for ViewSheet: CSV text -> { headers, rows }
+// Adapter for ViewSheet
 const parseCsvForView = (text) => {
   const rows = parseCsv(text);
   if (!rows.length) return { headers: [], rows: [] };
@@ -216,9 +214,8 @@ const submitToGoogleForm = (entries) => {
   setTimeout(() => { form.remove(); iframe.remove(); }, 3000);
 };
 
-
 const toEntries = (v, executiveName) => ({
-  [ENTRY.serial]: v.serialNo ?? "",  
+  [ENTRY.serial]: v.serialNo ?? "",
   [ENTRY.name]: v.name ?? "",
   [ENTRY.phone]: v.mobile ?? "",
   [ENTRY.company]: v.company ?? "",
@@ -226,7 +223,7 @@ const toEntries = (v, executiveName) => ({
   [ENTRY.variant]: v.variant ?? "",
   [ENTRY.executive]: executiveName ?? "",
   [ENTRY.remarks]: v.remarks ?? "",
-  [ENTRY.branch]: v.branch ?? "",       
+  [ENTRY.branch]: v.branch ?? "",
 });
 
 /* ======================
@@ -259,7 +256,7 @@ const makeEmptyVehicle = () => ({
   variant: "",
   onRoadPrice: 0,
   downPayment: 0,
-  emiSet: "12", // "12" or "48"
+  emiSet: "12",
 });
 
 /* ======================
@@ -267,7 +264,6 @@ const makeEmptyVehicle = () => ({
    ====================== */
 export default function Quotation() {
   const [form] = Form.useForm();
- 
 
   const [brand, setBrand] = useState("SHANTHA"); // "SHANTHA" | "NH"
 
@@ -276,24 +272,12 @@ export default function Quotation() {
   const [model, setModel] = useState("");
   const [variant, setVariant] = useState("");
 
-   const [lastSavedAt, setLastSavedAt] = useState(0);
+  const [lastSavedAt, setLastSavedAt] = useState(0);
 
-  const safeAutoSave = async () => {
-    const now = Date.now();
-    if (now - lastSavedAt < 10000) return; // skip if last save was <10s ago
-    const v = await handleSaveToForm();   // validates + saves
-    setLastSavedAt(now);
-    return v;
-  };
-
-  // keep a mirror for EMI math
   const [onRoadPrice, setOnRoadPrice] = useState(0);
-
   const [manual, setManual] = useState(false);
   const [sheetOk, setSheetOk] = useState(false);
-
   const [mode, setMode] = useState("cash");
-
   const [emiSet, setEmiSet] = useState("12");
   const tenures = useMemo(
     () => (emiSet === "12" ? [12, 18, 24, 36] : [24, 30, 36, 48]),
@@ -301,14 +285,20 @@ export default function Quotation() {
   );
 
   const [downPayment, setDownPayment] = useState(0);
-
   const [vehicleType, setVehicleType] = useState("scooter");
   const [fittings, setFittings] = useState(["Side Stand", "Floor Mat", "ISI Helmet", "Grip Cover"]);
   const [docsReq, setDocsReq] = useState(DOCS_REQUIRED);
-
   const [extraVehicles, setExtraVehicles] = useState([]); // up to 2 records (V2, V3)
 
   const executiveName = Form.useWatch("executive", form) || EXECUTIVES[0].name;
+
+  // ✅ antd message instance + helper to ensure popup shows before opening new tab/print
+  const [msgApi, msgCtx] = message.useMessage();
+  const toastSaved = async (txt = "Saved successfully") => {
+    msgApi.destroy("save");
+    msgApi.open({ key: "save", type: "success", content: txt, duration: 1.5 });
+    await new Promise((r) => setTimeout(r, 300));
+  };
 
   const pageRef = useRef(null);
   const printDate = useMemo(() => {
@@ -334,7 +324,7 @@ export default function Quotation() {
           .map(normalizeSheetRow)
           .filter((r) => r.company && r.model && r.variant);
         if (!cleaned.length) {
-          message.warning("Sheet loaded but no valid rows. Switching to manual entry.");
+          msgApi.warning("Sheet loaded but no valid rows. Switching to manual entry.");
           setManual(true);
           setSheetOk(false);
           return;
@@ -342,12 +332,12 @@ export default function Quotation() {
         setBikeData(cleaned);
         setSheetOk(true);
       } catch {
-        message.warning("Could not load vehicle sheet. Switched to manual entry.");
+        msgApi.warning("Could not load vehicle sheet. Switched to manual entry.");
         setManual(true);
         setSheetOk(false);
       }
     })();
-  }, []);
+  }, [msgApi]);
 
   useEffect(() => {
     (async () => {
@@ -359,7 +349,6 @@ export default function Quotation() {
   }, [form]);
 
   useEffect(() => {
-    // When NH Motors is selected, default the executive to Meghana once.
     if (brand === "NH") {
       form.setFieldsValue({ executive: MEGHANA_NAME });
     }
@@ -417,82 +406,144 @@ export default function Quotation() {
   };
   const tenuresForSet = (s) => (s === "12" ? [12, 18, 24, 30] : [24, 30, 36, 48]);
 
+  const safeAutoSave = async () => {
+    const now = Date.now();
+    if (now - lastSavedAt < 10000) return; // debounce 10s
+    const v = await handleSaveToForm();   // validates + saves
+    setLastSavedAt(now);
+    return v;
+  };
+
   // ---------- Android-proof A4 print ----------
   const handlePrint = async () => {
-   // Auto-save (also validates + assigns serial)
-   try {
-    await safeAutoSave();
-     message.success("Saved automatically. Preparing print…");
-   } catch (e) {
-     message.warning(e?.message || "Fix the highlighted fields before printing.");
-     return;
-   }
+    try {
+      await safeAutoSave();
+      await toastSaved("Saved successfully. Preparing print…");
 
-    const page = pageRef.current;
-    if (!page) { window.print(); return; }
+      const page = pageRef.current;
+      if (!page) { window.print(); return; }
 
-    // Ensure latest React commit is flushed
-    await new Promise((r) => setTimeout(r, 0));
+      // Ensure latest React commit is flushed
+      await new Promise((r) => setTimeout(r, 0));
 
-    const cloned = page.cloneNode(true);
+      const cloned = page.cloneNode(true);
 
-    // canvas -> img (Android print-safe)
-    cloned.querySelectorAll("canvas").forEach(cnv => {
-      try {
-        const img = document.createElement("img");
-        img.alt = cnv.getAttribute("aria-label") || "canvas";
-        img.src = cnv.toDataURL("image/png");
-        img.style.maxWidth = "100%";
-        img.style.height = "auto";
-        cnv.parentNode && cnv.parentNode.replaceChild(img, cnv);
-      } catch { /* ignore */ }
-    });
+      // canvas -> img (Android print-safe)
+      cloned.querySelectorAll("canvas").forEach((cnv) => {
+        try {
+          const img = document.createElement("img");
+          img.alt = cnv.getAttribute("aria-label") || "canvas";
+          img.src = cnv.toDataURL("image/png");
+          img.style.maxWidth = "100%";
+          img.style.height = "auto";
+          cnv.parentNode && cnv.parentNode.replaceChild(img, cnv);
+        } catch { /* ignore */ }
+      });
 
-    // absolute + cache-busted images
-    cloned.querySelectorAll("img").forEach(img => {
-      const src = img.getAttribute("src");
-      if (src && !src.startsWith("data:")) img.setAttribute("src", absBust(src));
-    });
+      // absolute + cache-busted images
+      cloned.querySelectorAll("img").forEach((img) => {
+        const src = img.getAttribute("src");
+        if (src && !src.startsWith("data:")) img.setAttribute("src", absBust(src));
+      });
 
-    const PRINT_STYLES = `
-      @page { size: A4 portrait; margin: 0; }
-      html, body {
-        margin: 0 !important; padding: 0 !important; background: #fff !important;
-        -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
-        font-family: Arial, sans-serif;
+      const PRINT_STYLES = `
+        @page { size: A4 portrait; margin: 0; }
+        html, body {
+          margin: 0 !important; padding: 0 !important; background: #fff !important;
+          -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
+          font-family: Arial, sans-serif;
+        }
+        * { box-sizing: border-box; }
+        .print-wrap { margin: 0 auto; }
+        .page { width: 210mm; min-height: 297mm; padding: 12mm; background: #fff !important; }
+        .sheet { width: 100%; font: 12pt/1.32 Arial, sans-serif; color: #111; page-break-inside: avoid; }
+        .row2 { display: grid; grid-template-columns: 0.8fr 1.4fr; gap: 8px 16px; }
+        .row3 { display: grid; grid-template-columns: 0.5fr 0.8fr 1fr; gap: 10px 16px; }
+        .box { border: 2px solid #000; border-radius: 6px; padding: 8px 10px; background: #fff; }
+        .plist { margin: 0; padding-left: 18px; } .plist li { margin: 0 0 2px; }
+        .title-knhonda { font-size: 30pt; font-weight: 900; letter-spacing: .2px; }
+        .title-kn { font-size: 32pt; font-weight: 500; letter-spacing: .2px; }
+        .title-en { font-size: 18pt; font-weight: 600; margin-top: 2px; }
+        .big-price { font-size: 16pt; font-weight: 900; }
+        .addr-line { font-size: 11pt; } .addr-linehonda { font-size: 12pt; }
+        .hdr-line { display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px; }
+        .hdr-title { flex: 1; display: flex; justify-content: center; }
+        .quo-box { font-size: 17pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; display: inline-block; }
+        .hdr-right { text-align: right; font-weight: 600; }
+        .emibox { border: 2px solid #000; border-radius: 8px; padding: 6px 10px; text-align: center; }
+        .section-title { font-size: 14pt; font-weight: 900; margin-bottom: 4px; }
+        img { max-width: 100%; height: auto; background: transparent; }
+        @media print {
+          * { transform: none !important; }
+          .fixed, .sticky, [style*="position: sticky"], [style*="position: fixed"] { position: static !important; }
+          .no-print { display: none !important; }
+        }
+      `;
+
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+      if (isMobile) {
+        const win = window.open("", "_blank");
+        if (!win) { msgApi.error("Please allow pop-ups to print."); return; }
+        const doc = win.document;
+
+        doc.open();
+        doc.write(`
+          <!doctype html>
+          <html>
+          <head>
+            <meta charset="utf-8"/>
+            <meta name="viewport" content="width=device-width, initial-scale=1"/>
+            <base href="${location.origin}${location.pathname}">
+            <title>Quotation</title>
+            <style>${PRINT_STYLES}</style>
+          </head>
+          <body>
+            <div class="print-wrap"></div>
+          </body>
+          </html>
+        `);
+        doc.close();
+
+        const mount = doc.querySelector(".print-wrap");
+        const node = doc.importNode(cloned, true);
+        mount.appendChild(node);
+
+        const waitForAssets = async () => {
+          const imgs = Array.from(doc.images || []);
+          await Promise.all(
+            imgs.map((img) =>
+              (img.complete && img.naturalWidth)
+                ? Promise.resolve()
+                : new Promise((res) => { img.onload = img.onerror = () => res(); })
+            )
+          );
+          if (doc.fonts && doc.fonts.ready) { try { await doc.fonts.ready; } catch {
+            //ksjdf
+          } }
+          await new Promise((res) => setTimeout(res, 200));
+        };
+
+        await waitForAssets();
+        try { win.focus(); } catch {
+          //lkhfj
+        }
+        win.print();
+        return;
       }
-      * { box-sizing: border-box; }
-      .print-wrap { margin: 0 auto; }
-      .page { width: 210mm; min-height: 297mm; padding: 12mm; background: #fff !important; }
-      .sheet { width: 100%; font: 12pt/1.32 Arial, sans-serif; color: #111; page-break-inside: avoid; }
-      .row2 { display: grid; grid-template-columns: 0.8fr 1.4fr; gap: 8px 16px; }
-      .row3 { display: grid; grid-template-columns: 0.5fr 0.8fr 1fr; gap: 10px 16px; }
-      .box { border: 2px solid #000; border-radius: 6px; padding: 8px 10px; background: #fff; }
-      .plist { margin: 0; padding-left: 18px; } .plist li { margin: 0 0 2px; }
-      .title-knhonda { font-size: 30pt; font-weight: 900; letter-spacing: .2px; }
-      .title-kn { font-size: 32pt; font-weight: 500; letter-spacing: .2px; }
-      .title-en { font-size: 18pt; font-weight: 600; margin-top: 2px; }
-      .big-price { font-size: 16pt; font-weight: 900; }
-      .addr-line { font-size: 11pt; } .addr-linehonda { font-size: 12pt; }
-      .hdr-line { display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:8px; }
-      .hdr-title { flex: 1; display: flex; justify-content: center; }
-      .quo-box { font-size: 17pt; border: 2px solid #000; padding: 4px 10px; font-weight: 800; display: inline-block; }
-      .hdr-right { text-align: right; font-weight: 600; }
-      .emibox { border: 2px solid #000; border-radius: 8px; padding: 6px 10px; text-align: center; }
-      .section-title { font-size: 14pt; font-weight: 900; margin-bottom: 4px; }
-      img { max-width: 100%; height: auto; background: transparent; }
-      @media print {
-        * { transform: none !important; }
-        .fixed, .sticky, [style*="position: sticky"], [style*="position: fixed"] { position: static !important; }
-        .no-print { display: none !important; }
-      }
-    `;
 
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      // Desktop: iframe flow
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      iframe.setAttribute("aria-hidden", "true");
+      document.body.appendChild(iframe);
 
-    if (isMobile) {
-      const win = window.open("", "_blank");
-      if (!win) { message.error("Please allow pop-ups to print."); return; }
+      const win = iframe.contentWindow;
       const doc = win.document;
 
       doc.open();
@@ -514,90 +565,35 @@ export default function Quotation() {
       doc.close();
 
       const mount = doc.querySelector(".print-wrap");
-      const node = doc.importNode(cloned, true);
-      mount.appendChild(node);
+      mount.appendChild(doc.importNode(cloned, true));
 
       const waitForAssets = async () => {
         const imgs = Array.from(doc.images || []);
         await Promise.all(
-          imgs.map(img =>
+          imgs.map((img) =>
             (img.complete && img.naturalWidth)
               ? Promise.resolve()
-              : new Promise(res => { img.onload = img.onerror = () => res(); })
+              : new Promise((res) => { img.onload = img.onerror = () => res(); })
           )
         );
         if (doc.fonts && doc.fonts.ready) { try { await doc.fonts.ready; } catch {
-          //ujju
-         } }
-        await new Promise(res => setTimeout(res, 200));
+          //jsehfi
+        } }
+        await new Promise((res) => setTimeout(res, 200));
       };
 
-      await waitForAssets();
-      try { win.focus(); } catch {
-        /* ignore */
-       }
-      win.print();
-      return;
-    }
-
-    // Desktop: iframe flow
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.right = "0";
-    iframe.style.bottom = "0";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
-    iframe.style.border = "0";
-    iframe.setAttribute("aria-hidden", "true");
-    document.body.appendChild(iframe);
-
-    const win = iframe.contentWindow;
-    const doc = win.document;
-
-    doc.open();
-    doc.write(`
-      <!doctype html>
-      <html>
-      <head>
-        <meta charset="utf-8"/>
-        <meta name="viewport" content="width=device-width, initial-scale=1"/>
-        <base href="${location.origin}${location.pathname}">
-        <title>Quotation</title>
-        <style>${PRINT_STYLES}</style>
-      </head>
-      <body>
-        <div class="print-wrap"></div>
-      </body>
-      </html>
-    `);
-    doc.close();
-
-    const mount = doc.querySelector(".print-wrap");
-    mount.appendChild(doc.importNode(cloned, true));
-
-    const waitForAssets = async () => {
-      const imgs = Array.from(doc.images || []);
-      await Promise.all(
-        imgs.map(img =>
-          (img.complete && img.naturalWidth)
-            ? Promise.resolve()
-            : new Promise(res => { img.onload = img.onerror = () => res(); })
-        )
-      );
-      if (doc.fonts && doc.fonts.ready) { try { await doc.fonts.ready; } catch {
-        //
-       } }
-      await new Promise(res => setTimeout(res, 200));
-    };
-
-    try {
-      await waitForAssets();
-      try { win.focus(); } catch { 
-        //gy
+      try {
+        await waitForAssets();
+        try { win.focus(); } catch {
+          //jhafg
+        }
+        try { win.print(); } catch { window.print(); }
+      } finally {
+        setTimeout(() => { iframe.parentNode && iframe.parentNode.removeChild(iframe); }, 800);
       }
-      try { win.print(); } catch { window.print(); }
-    } finally {
-      setTimeout(() => { iframe.parentNode && iframe.parentNode.removeChild(iframe); }, 800);
+    } catch (e) {
+      msgApi.warning(e?.message || "Fix the highlighted fields before printing.");
+      return;
     }
   };
 
@@ -684,24 +680,25 @@ export default function Quotation() {
         onRoadPrice: v.onRoadPrice,
         executive: v.executive,
         remarks: mergedRemarks,
-        branch: v.branch || "", 
+        branch: v.branch || "",
       },
       extraVehicles,        // [{company, model, variant, onRoadPrice, downPayment, emiSet}, ...]
     };
     const payloadStr = JSON.stringify(payload);
 
     const entries = toEntries(
-   {
-     ...v,
-     branch: v.branch ?? form.getFieldValue("branch"), // <- ensure present
-     remarks: mergedRemarks,
-   },
-   executiveName
- );
+      {
+        ...v,
+        branch: v.branch ?? form.getFieldValue("branch"), // <- ensure present
+        remarks: mergedRemarks,
+      },
+      executiveName
+    );
     entries[ENTRY.payload] = payloadStr;
     submitToGoogleForm(entries);
     return v;
   };
+
   // --------- WhatsApp deep-link ----------
   const toE164NoPlusIndia = (raw) => {
     const digits = String(raw || "").replace(/\D/g, "").replace(/^0+/, "");
@@ -710,29 +707,28 @@ export default function Quotation() {
     return "";
   };
 
-   const handleWhatsAppClick = async () => {
-   try {
-     // Auto-save (also validates + assigns serial)
-     await safeAutoSave();
-     message.success("Saved automatically. Opening WhatsApp…");
-     // After save, safely use current values
-     const v = form.getFieldsValue(true);
+  const handleWhatsAppClick = async () => {
+    try {
+      // validate + save first
+      await safeAutoSave();
+      await toastSaved("Saved successfully. Opening WhatsApp…");
 
+      const v = form.getFieldsValue(true);
       const phone = toE164NoPlusIndia(v.mobile);
       if (!phone) {
-        message.error("Enter a valid 10-digit Indian mobile to open WhatsApp.");
+        msgApi.error("Enter a valid 10-digit Indian mobile to open WhatsApp.");
         return;
       }
 
       const showroomName = (brand === "SHANTHA" ? "Shantha Motors" : "NH Motors");
-      const name   = (form.getFieldValue("name") || "-").trim();
+      const name = (form.getFieldValue("name") || "-").trim();
 
       // V1 (main)
-      const comp1   = (company || form.getFieldValue("company") || "-").trim();
-      const mdl1    = (model   || form.getFieldValue("bikeModel") || "-").trim();
-      const varnt1  = (variant || form.getFieldValue("variant")   || "-").trim();
-      const price1  = form.getFieldValue("onRoadPrice") ?? onRoadPrice ?? 0;
-      const dp1     = downPayment || 0;
+      const comp1 = (company || form.getFieldValue("company") || "-").trim();
+      const mdl1 = (model || form.getFieldValue("bikeModel") || "-").trim();
+      const varnt1 = (variant || form.getFieldValue("variant") || "-").trim();
+      const price1 = form.getFieldValue("onRoadPrice") ?? onRoadPrice ?? 0;
+      const dp1 = downPayment || 0;
 
       // V2..V3
       const vehicles = [
@@ -749,64 +745,84 @@ export default function Quotation() {
       ];
 
       const execPhone = (EXECUTIVES.find(e => e.name === executiveName) || {}).phone || "-";
-      const printDate = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+      const qDate = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 
-      // Header
-      const header = [
-        `*Hi ${name}, Welcome to ${showroomName}! 🚀*`,
-        `_Your personalized quotation is ready — with multiple options tailored for you._`,
-        ``,
-        `• *Quotation Date:* ${printDate}`,
-      ];
+      // A little flair
+const bikeEmoji = vehicleType === "scooter" ? "🛵" : "🏍️";
+const line = "━━━━━━━━━━━━━━━━━━━━";
 
-      // Vehicle sections
-      const vblocks = vehicles.map((it) => {
-        const tset = tenuresForSet(it.emiSet);
-        const emiLines = (mode === "loan")
-          ? [
-              `   – Down Payment: ${inr0(it.dp || 0)}`,
-              ...tset.map((mo) => `   – ${mo} months: ${inr0(monthlyFor(it.price, it.dp || 0, mo))}`)
-            ]
-          : [];
-        return [
-          ``,
-          `*${it.title}:*`,
-          `• *Vehicle:* ${it.company} ${it.model} ${it.variant}`,
-          `• *On-Road Price:* ${inr0(it.price)}`,
-          ...(mode === "loan" ? [`• *EMI Options (approx.):*`, ...emiLines] : []),
-        ].join("\n");
-      });
+// Header
+const header = [
+  `*Hi ${name}*, welcome to *${showroomName}* ${bikeEmoji}`,
+  `_Multi-brand two-wheeler sales, service, spares, exchange, finance & insurance_`,
+  ` *Mob No: 9731366921 / 8073283502*`,
+  line,
+  `*Quotation Date:* ${qDate}`,
+  `*Quotation No.:* ${form.getFieldValue("serialNo") || "-"}`,
+];
 
-      // Add Free Fittings + Documents sections to the message
-      const selectedFittings = Array.isArray(fittings) ? fittings.filter(Boolean) : [];
-      const selectedDocsReq = Array.isArray(docsReq) ? docsReq.filter(Boolean) : [];
+// Vehicle sections
+const vblocks = vehicles.map((it) => {
+  const tset = tenuresForSet(it.emiSet);
+  const emiLines =
+    mode === "loan"
+      ? [
+          `   • Down Payment: ${inr0(it.dp || 0)}`,
+          ...tset.map(
+            (mo) =>
+              `   • ${mo} months: ${inr0(
+                monthlyFor(it.price, it.dp || 0, mo)
+              )}`
+          ),
+        ]
+      : [];
 
-      const afterVehicles = [
-        ``,
-        ...(selectedFittings.length
-          ? [`*Free Extra Fittings:*`, ...selectedFittings.map(f => `   ✅ ${f}`)]
-          : []),
-        ...(selectedDocsReq.length
-          ? [``, `*Documents Required:*`, ...selectedDocsReq.map(d => `   📄 ${d}`)]
-          : []),
-      ];
+  const titleEmoji = bikeEmoji; // same emoji for all vehicles; customize if you like
+  return [
+    ``,
+    `*${it.title}* ${titleEmoji}`,
+    `• *Vehicle:* ${it.company} ${it.model}${it.variant ? ` (${it.variant})` : ""}`,
+    `• *On-Road Price:* ${inr0(it.price)}`,
+    ...(mode === "loan" ? [`• *EMI Options* 💳`, ...emiLines] : []),
+    line,
+  ].join("\n");
+});
 
-      const footer = [
-        ``,
-        `• *Sales Advisor:* ${executiveName || "-"} (${execPhone})`,
-        `• *Note:* Prices are indicative and may change without prior notice.`,
-        ``,
-        `✨ *${showroomName} — Ride with Pride, Drive with Confidence.* ✨`
-      ];
+// Fittings + Docs
+const selectedFittings = Array.isArray(fittings) ? fittings.filter(Boolean) : [];
+const selectedDocsReq = Array.isArray(docsReq) ? docsReq.filter(Boolean) : [];
+
+const afterVehicles = [
+  ``,
+  ...(selectedFittings.length
+    ? [`*Free Fittings* 🎁`, ...selectedFittings.map((f) => `   • ${f}`)]
+    : []),
+  ...(selectedDocsReq.length
+    ? [``, `*Documents Required* 🧾`, ...selectedDocsReq.map((d) => `   • ${d}`)]
+    : []),
+];
+
+// Footer
+const footer = [
+  ``,
+  `*Sales Executive:* ${executiveName || "-"} — ${execPhone}`,
+  ``,
+  `*Our Locations* 📍`,
+  `Muddinapalya • Hegganahalli • Nelagadrahalli • Andrahalli`,
+  `Kadabagere • Channenahalli • Tavarekere • D-Group Layout`,
+  line,
+  `Reply with *YES* to proceed or ask me anything.`,
+  `✨ *${showroomName} — Ride with Pride, Drive with Confidence.* ✨`,
+];
+
 
       const text = [...header, ...vblocks, ...afterVehicles, ...footer].join("\n");
       const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
 
       const w = window.open(url, "_blank", "noopener,noreferrer");
       if (!w) window.location.href = url;
-
     } catch (err) {
-      message.warning(err?.message || "Please fill all required fields before sending on WhatsApp.");
+      msgApi.warning(err?.message || "Please fill all required fields before sending on WhatsApp.");
     }
   };
 
@@ -820,11 +836,7 @@ export default function Quotation() {
     [...new Set(bikeData.filter((r) => r.company === comp).map((r) => r.model))];
 
   const filteredVariants = (comp, mdl) =>
-    [
-      ...new Set(
-        bikeData.filter((r) => r.company === comp && r.model === mdl).map((r) => r.variant)
-      ),
-    ];
+    [...new Set(bikeData.filter((r) => r.company === comp && r.model === mdl).map((r) => r.variant))];
 
   const onExtraChange = (idx, patch) => {
     setExtraVehicles((prev) => {
@@ -875,7 +887,6 @@ export default function Quotation() {
   const onValuesChange = (_, all) => {
     if (typeof all?.onRoadPrice !== "undefined") {
       setOnRoadPrice(Number(all.onRoadPrice || 0));
-      // clamp DP if needed
       if (downPayment > Number(all.onRoadPrice || 0)) {
         setDownPayment(Number(all.onRoadPrice || 0));
       }
@@ -884,6 +895,7 @@ export default function Quotation() {
 
   return (
     <>
+      {msgCtx}{/* 👈 enables the pop-up to actually render */}
       <style>{`
         .wrap { max-width: 1000px; margin: 12px auto; padding: 0 12px; }
         .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; }
@@ -898,10 +910,9 @@ export default function Quotation() {
       {/* On-screen inputs */}
       <div className="wrap no-print">
         <div className="card">
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-         {/* NEW: Fetch saved quotation by Quotation No. or Mobile */}
-       
-       </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {/* NEW: Fetch saved quotation by Quotation No. or Mobile */}
+          </div>
           <Form
             layout="vertical"
             form={form}
@@ -909,56 +920,56 @@ export default function Quotation() {
             onValuesChange={onValuesChange}
           >
             <Row gutter={[12, 8]}>
-                <Col span={24}>
-              <div
-                className="brand-actions-row"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr auto",
-                  alignItems: "center",
-                  gap: 12,
-                }}
-              >
-                <Form.Item label="Brand on Print" style={{ marginBottom: 0 }}>
-                  <Radio.Group value={brand} onChange={(e)=>setBrand(e.target.value)}>
-                    <Radio value="SHANTHA">Shantha Motors</Radio>
-                    <Radio value="NH">NH Motors (Honda)</Radio>
-                  </Radio.Group>
-                </Form.Item>
-                {/* Right-side stacked buttons */}
-                <div className="brand-actions" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <FetchQuot
-                    form={form}
-                    responsesCsvUrl={RESPONSES_CSV_URL}
-                    parseCsv={parseCsv}
-                    EXECUTIVES={EXECUTIVES}
-                    setBrand={setBrand}
-                    setMode={setMode}
-                    setVehicleType={setVehicleType}
-                    setFittings={setFittings}
-                    setDocsReq={setDocsReq}
-                    setEmiSet={setEmiSet}
-                    setDownPayment={setDownPayment}
-                    setOnRoadPrice={setOnRoadPrice}
-                    setCompany={setCompany}
-                    setModel={setModel}
-                    setVariant={setVariant}
-                    setExtraVehicles={setExtraVehicles}
-                    buttonText="Fetch Details"
-                    buttonProps={{
-                      style: { background: "#2ECC71", borderColor: "#2ECC71", color: "#fff" },
-                    }}
-                  />
-                  <ViewSheet
-                    sheetCsvUrl={RESPONSES_CSV_URL}
-                    parseCSV={parseCsvForView}
-                    dateColumn="Timestamp"
-                    buttonText="View Sheet"
-                    buttonProps={{ type: "primary" }}
-                  />
+              <Col span={24}>
+                <div
+                  className="brand-actions-row"
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr auto",
+                    alignItems: "center",
+                    gap: 12,
+                  }}
+                >
+                  <Form.Item label="Brand on Print" style={{ marginBottom: 0 }}>
+                    <Radio.Group value={brand} onChange={(e)=>setBrand(e.target.value)}>
+                      <Radio value="SHANTHA">Shantha Motors</Radio>
+                      <Radio value="NH">NH Motors (Honda)</Radio>
+                    </Radio.Group>
+                  </Form.Item>
+                  {/* Right-side stacked buttons */}
+                  <div className="brand-actions" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <FetchQuot
+                      form={form}
+                      responsesCsvUrl={RESPONSES_CSV_URL}
+                      parseCsv={parseCsv}
+                      EXECUTIVES={EXECUTIVES}
+                      setBrand={setBrand}
+                      setMode={setMode}
+                      setVehicleType={setVehicleType}
+                      setFittings={setFittings}
+                      setDocsReq={setDocsReq}
+                      setEmiSet={setEmiSet}
+                      setDownPayment={setDownPayment}
+                      setOnRoadPrice={setOnRoadPrice}
+                      setCompany={setCompany}
+                      setModel={setModel}
+                      setVariant={setVariant}
+                      setExtraVehicles={setExtraVehicles}
+                      buttonText="Fetch Details"
+                      buttonProps={{
+                        style: { background: "#2ECC71", borderColor: "#2ECC71", color: "#fff" },
+                      }}
+                    />
+                    <ViewSheet
+                      sheetCsvUrl={RESPONSES_CSV_URL}
+                      parseCSV={parseCsvForView}
+                      dateColumn="Timestamp"
+                      buttonText="View Sheet"
+                      buttonProps={{ type: "primary" }}
+                    />
+                  </div>
                 </div>
-              </div>
-            </Col>
+              </Col>
 
               <Col span={24}>
                 <Form.Item label="Type manually (no sheet)" valuePropName="checked">
@@ -978,17 +989,18 @@ export default function Quotation() {
                   <Input placeholder="Auto-filled (1, 2, 3…)" />
                 </Form.Item>
               </Col>
+
               {/* NEW: Branch */}
-<Col xs={24} md={6}>
-  <Form.Item label="Branch" name="branch">
-    <Select
-      placeholder="Select branch"
-      options={BRANCHES.map(b => ({ value: b, label: b }))}
-      showSearch
-      optionFilterProp="label"
-    />
-  </Form.Item>
-</Col>
+              <Col xs={24} md={6}>
+                <Form.Item label="Branch" name="branch">
+                  <Select
+                    placeholder="Select branch"
+                    options={BRANCHES.map(b => ({ value: b, label: b }))}
+                    showSearch
+                    optionFilterProp="label"
+                  />
+                </Form.Item>
+              </Col>
 
               <Col xs={24} md={6}>
                 <Form.Item label="Executive Name" name="executive">
@@ -1028,7 +1040,7 @@ export default function Quotation() {
                 </Form.Item>
               </Col>
 
-              {/* Vehicle 1 (existing main) */}
+              {/* Vehicle 1 */}
               <Col span={24}>
                 <Divider orientation="left">Vehicle 1</Divider>
               </Col>
@@ -1136,7 +1148,7 @@ export default function Quotation() {
                 </>
               )}
 
-              {/* GLOBAL Vehicle Type & Fittings (unchanged) */}
+              {/* GLOBAL Vehicle Type & Fittings */}
               <Col xs={24} md={12}>
                 <Form.Item label="Vehicle Type" name="vehicleType">
                   <Radio.Group
@@ -1396,7 +1408,7 @@ export default function Quotation() {
               >
                 {/* LEFT: brand names + addresses + mobiles */}
                 <div>
-                  {/* Brand names horizontally (smaller than before) */}
+                  {/* Brand names horizontally */}
                   <div
                     style={{
                       display: "flex",
@@ -1430,7 +1442,7 @@ export default function Quotation() {
                     )}
                   </div>
 
-                  {/* Addresses + mobile (condensed lines as requested) */}
+                  {/* Addresses + mobile */}
                   {brand === "SHANTHA" ? (
                     <>
                       <div className="addr-line" style={{ fontSize: "13pt" }}>
@@ -1561,9 +1573,11 @@ export default function Quotation() {
                           <div style={{ fontWeight: 900, textAlign: "center", marginBottom: 4, fontSize: "14pt" }}>EMI DETAILS</div>
                           <div style={{ display: "flex", gap: 8, justifyContent: "space-between", flexWrap: "wrap" }}>
                             {tset.map((mo) => (
-                              <div key={mo} className="emibox" style={{ flex: 1, minWidth: 120 }}>
+                              <div key={mo} className="emibox" style={{ minWidth: 140 }}>
                                 <div style={{ fontWeight: 700 }}>{mo} months</div>
-                                <div style={{ fontWeight: 900 }}>{inr0(monthlyFor(ev.onRoadPrice || 0, ev.downPayment || 0, mo))}</div>
+                                <div style={{ fontWeight: 900 }}>
+                                  {inr0(monthlyFor(ev.onRoadPrice || 0, ev.downPayment || 0, mo))}
+                                </div>
                               </div>
                             ))}
                           </div>
