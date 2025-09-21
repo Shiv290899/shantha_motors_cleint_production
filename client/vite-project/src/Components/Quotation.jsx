@@ -115,7 +115,7 @@ const EXECUTIVES = [
   { name: "Meghana", phone: "9741609799" },
   { name: "Shubha", phone: "8971585057" },
   { name: "Rani", phone: "9108970455" },
-  { name: "Likhitha", phone: "9535190015" },
+  { name: "Likitha", phone: "9535190015" },
   { name: "Vanitha", phone: "9380729861" },
   { name: "Prakash", phone: "9740176476" },
   { name: "Swathi", phone: "6363116317" },
@@ -200,6 +200,7 @@ const MOTORCYCLE_OPTIONS = [
   "Ladies Handle",
   "Gripper",
   "Seat Cover",
+  "ISI Helmet",
 ];
 
 const DOCS_REQUIRED = [
@@ -408,7 +409,7 @@ export default function Quotation() {
     if (vehicleType === "scooter") {
       setFittings(["Side Stand", "Floor Mat", "ISI Helmet", "Grip Cover"]);
     } else {
-      setFittings(["Tank Cover", "Gripper", "Seat Cover"]);
+      setFittings(["Tank Cover", "Gripper", "Seat Cover", "ISI Helmet"]);
     }
   }, [vehicleType]);
 
