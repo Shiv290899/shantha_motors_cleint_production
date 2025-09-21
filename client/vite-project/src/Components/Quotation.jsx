@@ -211,6 +211,7 @@ const DOCS_REQUIRED = [
 ];
 
 const MEGHANA_NAME = "Meghana";
+const BRANCH_NAME = "Byadarahalli";
 
 /* ======================
    HELPERS
@@ -282,6 +283,39 @@ const makeEmptyVehicle = () => ({
   downPayment: 0,
   emiSet: "12",
 });
+
+/* ======================
+   CORE MANDATORY VALIDATION
+   ====================== */
+const CORE_KEYS = [
+  "branch",
+  "executive",
+  "name",
+  "mobile",
+  "company",
+  "bikeModel",
+  "variant",
+  "onRoadPrice",
+];
+
+const scrollToFirstError = (form, errInfo) => {
+  const first = errInfo?.errorFields?.[0]?.name;
+  if (first?.length) {
+    form.scrollToField(first, { behavior: "smooth", block: "center" });
+  }
+};
+
+const validateCore = async (form) => {
+  const values = await form.validateFields(CORE_KEYS);
+
+  const price = Number(values?.onRoadPrice || 0);
+  if (!(price > 0)) throw new Error("On-Road Price must be greater than 0.");
+
+  if (!/^[6-9]\d{9}$/.test(String(values?.mobile || ""))) {
+    throw new Error("Enter a valid 10-digit Indian mobile number.");
+  }
+  return values;
+};
 
 /* ======================
    COMPONENT
@@ -366,6 +400,7 @@ export default function Quotation() {
   useEffect(() => {
     if (brand === "NH") {
       form.setFieldsValue({ executive: MEGHANA_NAME });
+      form.setFieldsValue({ branch: BRANCH_NAME });
     }
   }, [brand, form]);
 
@@ -413,13 +448,13 @@ export default function Quotation() {
   const monthlyFor = (price, dp, months) => {
     const principalBase = Math.max(Number(price || 0) - Number(dp || 0), 0);
     const principal = principalBase + PROCESSING_FEE;
-       const years = months / 12;
+    const years = months / 12;
     const rate = rateFor(price, dp);
     const totalInterest = principal * (rate / 100) * years;
     const total = principal + totalInterest;
     return months > 0 ? total / months : 0;
   };
-  const tenuresForSet = (s) => (s === "12" ? [12, 18, 24, 30] : [24, 30, 36, 48]);
+  const tenuresForSet = (s) => (s === "12" ? [12, 18, 24, 36] : [24, 30, 36, 48]);
 
   const safeAutoSave = async () => {
     const now = Date.now();
@@ -432,6 +467,7 @@ export default function Quotation() {
   // ---------- Android-proof A4 print ----------
   const handlePrint = async () => {
     try {
+      await validateCore(form);
       await safeAutoSave();
       await toastSaved("Saved successfully. Preparing print…");
 
@@ -534,14 +570,14 @@ export default function Quotation() {
             )
           );
           if (doc.fonts && doc.fonts.ready) { try { await doc.fonts.ready; } catch {
-            //kjhdsif
+            // ignore
           } }
           await new Promise((res) => setTimeout(res, 200));
         };
 
         await waitForAssets();
         try { win.focus(); } catch {
-          //kjshf
+          //
         }
         win.print();
         return;
@@ -592,7 +628,7 @@ export default function Quotation() {
           )
         );
         if (doc.fonts && doc.fonts.ready) { try { await doc.fonts.ready; } catch {
-          //jsdhf
+          // ignore
         } }
         await new Promise((res) => setTimeout(res, 200));
       };
@@ -600,7 +636,7 @@ export default function Quotation() {
       try {
         await waitForAssets();
         try { win.focus(); } catch {
-          //jsf
+          //console.log(err)
         }
         try { win.print(); } catch { window.print(); }
       } finally {
@@ -608,6 +644,11 @@ export default function Quotation() {
       }
     } catch (e) {
       msgApi.warning(e?.message || "Fix the highlighted fields before printing.");
+      try {
+        await form.validateFields(CORE_KEYS);
+      } catch (errInfo) {
+        scrollToFirstError(form, errInfo);
+      }
       return;
     }
   };
@@ -637,9 +678,42 @@ export default function Quotation() {
   };
 
   /* ======================
+     LIVE "canAct" DISABLING
+     ====================== */
+  const wBranch = Form.useWatch("branch", form);
+  const wExec   = Form.useWatch("executive", form);
+  const wName   = Form.useWatch("name", form);
+  const wMobile = Form.useWatch("mobile", form);
+  const wComp   = Form.useWatch("company", form);
+  const wModel  = Form.useWatch("bikeModel", form);
+  const wVar    = Form.useWatch("variant", form);
+  const wPrice  = Form.useWatch("onRoadPrice", form);
+
+  const canAct = useMemo(() => {
+    const mobileOk = /^[6-9]\d{9}$/.test(String(wMobile || ""));
+    const priceOk  = Number(wPrice || 0) > 0;
+    return Boolean(
+      wBranch && wExec && wName && mobileOk &&
+      wComp && wModel && wVar && priceOk
+    );
+  }, [wBranch, wExec, wName, wMobile, wComp, wModel, wVar, wPrice]);
+
+  /* ======================
      SAVE -> ASSIGN NEXT SERIAL -> SUBMIT
      ====================== */
   const handleSaveToForm = async () => {
+    try {
+      await validateCore(form);
+    } catch (err) {
+      message.error(err?.message || "Please complete all required fields.");
+      try {
+        await form.validateFields(CORE_KEYS);
+      } catch (errInfo) {
+        scrollToFirstError(form, errInfo);
+      }
+      throw err;
+    }
+
     // Do NOT require serialNo; we're going to assign it now
     const v = await form.validateFields([
       "name", "mobile", "address",
@@ -743,6 +817,7 @@ export default function Quotation() {
 
   const handleWhatsAppClick = async () => {
     try {
+      await validateCore(form);
       // validate + save first (will assign serial)
       await safeAutoSave();
       await toastSaved("Saved successfully. Opening WhatsApp…");
@@ -791,8 +866,9 @@ export default function Quotation() {
       ];
 
       // Vehicle sections
+      const tenuresForSetLocal = (s) => (s === "12" ? [12, 18, 24, 36] : [24, 30, 36, 48]);
       const vblocks = vehicles.map((it) => {
-        const tset = tenuresForSet(it.emiSet);
+        const tset = tenuresForSetLocal(it.emiSet);
         const emiLines = (mode === "loan")
           ? [
               `   – Down Payment: ${inr0(it.dp || 0)}`,
@@ -836,6 +912,11 @@ export default function Quotation() {
       if (!w) window.location.href = url;
     } catch (err) {
       msgApi.warning(err?.message || "Please fill all required fields before sending on WhatsApp.");
+      try {
+        await form.validateFields(CORE_KEYS);
+      } catch (errInfo) {
+        scrollToFirstError(form, errInfo);
+      }
     }
   };
 
@@ -984,7 +1065,6 @@ export default function Quotation() {
               </Col>
 
               {/* Quotation No. + Branch */}
-             
               <Col xs={24} md={8}>
                 <Form.Item
                   label="Quotation No."
@@ -993,7 +1073,7 @@ export default function Quotation() {
                   <Input placeholder="Auto at save" readOnly />
                 </Form.Item>
               </Col>
-               <Col xs={24} md={6}>
+              <Col xs={24} md={6}>
                 <Form.Item label="Branch" name="branch" rules={[{ required: true, message: "Select branch" }]}>
                   <Select
                     placeholder="Select branch"
@@ -1003,10 +1083,13 @@ export default function Quotation() {
                   />
                 </Form.Item>
               </Col>
-              
 
               <Col xs={24} md={6}>
-                <Form.Item label="Executive Name" name="executive">
+                <Form.Item
+                  label="Executive Name"
+                  name="executive"
+                  rules={[{ required: true, message: "Select executive" }]}
+                >
                   <Select options={EXECUTIVES.map((e) => ({ value: e.name, label: e.name }))} />
                 </Form.Item>
               </Col>
@@ -1038,7 +1121,7 @@ export default function Quotation() {
               </Col>
 
               <Col xs={24}>
-                <Form.Item label="Address" name="address" rules={[{ required: true, message: "Enter address" }]}>
+                <Form.Item label="Address" name="address" rules={[{  message: "Enter address" }]}>
                   <Input.TextArea rows={2} placeholder="House No, Street, Area, City, PIN" />
                 </Form.Item>
               </Col>
@@ -1102,7 +1185,20 @@ export default function Quotation() {
               </Col>
 
               <Col xs={24} md={12}>
-                <Form.Item label="On-Road Price (₹)" name="onRoadPrice" rules={[{ required: true }]}>
+                <Form.Item
+                  label="On-Road Price (₹)"
+                  name="onRoadPrice"
+                  rules={[
+                    { required: true, message: "Enter on-road price" },
+                    () => ({
+                      validator(_, val) {
+                        const n = Number(val || 0);
+                        if (n > 0) return Promise.resolve();
+                        return Promise.reject(new Error("On-road price must be greater than 0"));
+                      },
+                    }),
+                  ]}
+                >
                   <InputNumber
                     style={{ width: "100%" }}
                     readOnly={!manual}
@@ -1349,15 +1445,24 @@ export default function Quotation() {
 
               {/* Actions */}
               <Col span={24} style={{ textAlign: "right" }}>
+                <div style={{ marginBottom: 8, textAlign: "left", color: "#888", fontSize: 12 }}>
+                  {!canAct && (
+                    <span>
+                      Fill <b>Branch</b>, <b>Executive</b>, <b>Customer Name</b>, <b>Mobile</b>, and <b>Vehicle Details</b> to proceed.
+                    </span>
+                  )}
+                </div>
+
                 <Button
                   className="no-print"
                   onClick={handleWhatsAppClick}
+                  disabled={!canAct}
                   style={{ marginRight: 8, background: "#25D366", borderColor: "#25D366", color: "#fff" }}
                 >
                   WhatsApp
                 </Button>
 
-                <Button className="no-print" type="primary" icon={<PrinterOutlined />} onClick={handlePrint}>
+                <Button className="no-print" type="primary" icon={<PrinterOutlined />} onClick={handlePrint} disabled={!canAct}>
                   Print
                 </Button>
               </Col>
@@ -1546,7 +1651,7 @@ export default function Quotation() {
             {/* Extra Vehicles blocks on print */}
             {extraVehicles.map((ev, idx) => {
               const idx1 = idx + 2;
-              const tset = tenuresForSet(ev.emiSet || "12");
+              const tset = (ev.emiSet || "12") === "12" ? [12, 18, 24, 36] : [24, 30, 36, 48];
               return (
                 <div key={idx}>
                   <div className="box" style={{ marginBottom: 8 }}>
