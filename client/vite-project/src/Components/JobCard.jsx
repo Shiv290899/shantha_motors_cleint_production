@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import {
   Card, Col, DatePicker, Form, Grid, Input,
-  InputNumber, Row, Typography, message, Select, Button, Segmented, Checkbox
+  InputNumber, Row, Typography, message, Select, Button, Segmented, Checkbox, Tooltip
 } from "antd";
 import dayjs from "dayjs";
 import { handleSmartPrint } from "../utils/printUtils";
@@ -240,10 +240,10 @@ function autoSubmitToGoogle(entries) {
   // Clean up
   setTimeout(() => {
     try { document.body.removeChild(form); } catch {
-      //kljnsfjg
+      // do nothing
     }
     try { document.body.removeChild(iframe); } catch {
-    //klhf
+      // do nothing
     }
   }, 2000);
 }
@@ -326,8 +326,63 @@ export default function JobCard() {
   const [regDisplay, setRegDisplay] = useState("");
   const [serviceTypeLocal, setServiceTypeLocal] = useState(null);
   const [vehicleTypeLocal, setVehicleTypeLocal] = useState(null);
+  const [isReady, setIsReady] = useState(false); // ★ gate buttons
+  const [notReadyWhy, setNotReadyWhy] = useState(""); // ★ tooltip text
   const preRef = useRef(null);
   const postRef = useRef(null);
+
+  // ★ required field helpers
+  const BASE_REQUIRED = [
+    "createdAt",
+    "branch",
+    "mechanic",
+    "executive",
+    "expectedDelivery",
+    "regNo",
+    "model",
+    "km",
+    "custName",
+    "custMobile",
+    "serviceType",
+    "vehicleType",
+  ];
+  const requiredWithDynamic = (vals) => {
+    const list = [...BASE_REQUIRED];
+    if (vals?.vehicleType === "Scooter") list.push("floorMat"); // dynamic requirement
+    return list;
+  };
+
+  const recomputeReady = () => {
+    const valsNow = form.getFieldsValue(true);
+    const req = requiredWithDynamic(valsNow);
+    const allPresent = req.every((n) => {
+      const v = form.getFieldValue(n);
+      return v !== undefined && v !== null && String(v).trim() !== "";
+    });
+    const anyErrors = form.getFieldsError(req).some(({ errors }) => errors.length > 0);
+
+    // Build a short reason for UX
+    let reason = "";
+    if (!allPresent) {
+      const missing = req.filter((n) => {
+        const v = form.getFieldValue(n);
+        return v === undefined || v === null || String(v).trim() === "";
+      });
+      if (missing.length) reason = `Missing: ${missing.join(", ")}`;
+    } else if (anyErrors) {
+      reason = "Fix validation errors in highlighted fields.";
+    }
+
+    setIsReady(allPresent && !anyErrors);
+    setNotReadyWhy(reason);
+  };
+
+  const validateAllRequired = async () => {
+    const valsNow = form.getFieldsValue(true);
+    const req = requiredWithDynamic(valsNow);
+    await form.validateFields(req);
+  };
+  // ★ end required field helpers
 
   const initialValues = useMemo(
     () => ({
@@ -355,8 +410,6 @@ export default function JobCard() {
     }),
     []
   );
-
-  // NOTE: removed "set JC No. on mount" — we now assign at save-time only.
 
   const handleRegChange = (e) => {
     const next = formatReg(e.target.value);
@@ -413,11 +466,13 @@ export default function JobCard() {
     } else {
       form.setFieldsValue({ labourRows: [] });
     }
+    recomputeReady(); // ★ keep button state fresh
   };
 
   useEffect(() => {
-    // keep floorMat value; only hide UI for non-scooter
-  }, [vehicleTypeLocal, form]);
+    recomputeReady(); // ★ on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handlePrint = async (which) => {
     await new Promise(requestAnimationFrame);
@@ -430,18 +485,16 @@ export default function JobCard() {
 
   // ---- Auto Save (→ Google Form) ----
   const fmtDDMMYYYY = (d) => (d ? dayjs(d).format("DD/MM/YYYY") : "");
-  // Use the same separator everywhere for obs round-trip
   const OBS_SEP = " # ";
 
   const handleAutoSave = async () => {
     try {
-      // Validate required fields before save (JC No. will be assigned below)
-      await form.validateFields(["custName", "custMobile", "branch", "mechanic"]);
+      // ★ Validate ALL required fields (dynamic-aware)
+      await validateAllRequired();
 
       const vals = form.getFieldsValue(true);
 
       // 🔢 Ensure a fresh sequential JC No. at save-time.
-      // If jcNo is missing or non-numeric, fetch next from sheet and set it.
       let jc = vals.jcNo;
       if (!/^\d+$/.test(String(jc || "").trim())) {
         jc = await fetchNextJobCardSerial();
@@ -495,7 +548,6 @@ export default function JobCard() {
       });
     } catch (e) {
       message.error("Please complete required fields before auto-saving.");
-      // Re-throw so callers (WhatsApp/Pre-service) can block the action when invalid
       throw e;
     }
   };
@@ -512,12 +564,10 @@ export default function JobCard() {
   // --- Auto-save then WhatsApp ---
   const handleShareWhatsApp = async () => {
     try {
-      // Auto-save first (will throw if validation fails)
-      await handleAutoSave();
+      await handleAutoSave(); // will throw if invalid
 
-      // Re-read values (post-save) to build the message
       const valsNow = form.getFieldsValue(true);
-      await form.validateFields(["custName", "custMobile", "branch"]);
+      await form.validateFields(["custName", "custMobile", "branch"]); // already covered, fine as extra guard
 
       const mobileE164 = normalizeINPhone(valsNow.custMobile);
       if (!mobileE164) {
@@ -591,12 +641,18 @@ export default function JobCard() {
           </div>
         </Card>
 
-        <Form form={form} layout="vertical" initialValues={initialValues} style={{ marginTop: 12 }}>
+        <Form
+          form={form}
+          layout="vertical"
+          initialValues={initialValues}
+          style={{ marginTop: 12 }}
+          onValuesChange={recomputeReady} // ★ live-enable buttons as user fills
+        >
           {/* Job Details */}
           <Card size="small" bordered title="Job Details">
             <Row gutter={12}>
               <Col xs={12} sm={2}>
-                <Form.Item label="JC No." name="jcNo" rules={[{ required: true }]}>
+                <Form.Item label="JC No." name="jcNo" >
                   <Input placeholder="No Need to Enter" readOnly />
                 </Form.Item>
               </Col>
@@ -759,7 +815,11 @@ export default function JobCard() {
           <Card size="small" bordered style={{ marginTop: 12 }} title="Service">
             <Row gutter={12}>
               <Col xs={24} md={6}>
-                <Form.Item label="Service Type (tick one)">
+                <Form.Item
+                  label="Service Type (tick one)"
+                  name="serviceType"
+                  rules={[{ required: true, message: "Please select a service type" }]}
+                >
                   <Checkbox.Group
                     options={serviceOptions}
                     value={serviceTypeLocal ? [serviceTypeLocal] : []}
@@ -783,9 +843,6 @@ export default function JobCard() {
                       onChange={(val) => {
                         setVehicleTypeLocal(val);
                         form.setFieldsValue({ vehicleType: val });
-                        if (val !== "Scooter") {
-                          // keep existing value; default is "No"
-                        }
                         if (serviceTypeLocal) {
                           form.setFieldsValue({
                             labourRows: buildRows(serviceTypeLocal, val),
@@ -793,6 +850,8 @@ export default function JobCard() {
                             discounts: { labour: 0 },
                           });
                         }
+                        // keep floorMat value; default is "No"
+                        recomputeReady(); // ★
                       }}
                     />
                   </Form.Item>
@@ -811,7 +870,10 @@ export default function JobCard() {
                       className="blue-segmented"
                       block
                       options={["No", "Yes"]}
-                      onChange={(val) => form.setFieldsValue({ floorMat: val })}
+                      onChange={(val) => {
+                        form.setFieldsValue({ floorMat: val });
+                        recomputeReady(); // ★
+                      }}
                     />
                   </Form.Item>
                 </Col>
@@ -899,25 +961,31 @@ export default function JobCard() {
             </div>
           </Card>
 
-          {/* ACTION BUTTONS — Save removed; autosave on WhatsApp / Pre-service */}
+          {/* ACTION BUTTONS — gated by isReady */}
           <Row justify="end" style={{ marginTop: 12 }} gutter={8}>
             <Col>
-              <Button
-                type="default"
-                icon={<FaWhatsapp style={{ color: "#25D366" }} />}
-                onClick={handleShareWhatsApp}
-              >
-                WhatsApp/SMS
-              </Button>
+              <Tooltip title={isReady ? "" : (notReadyWhy || "Fill all required fields")} placement="top">
+                <Button
+                  type="default"
+                  icon={<FaWhatsapp style={{ color: "#25D366" }} />}
+                  onClick={handleShareWhatsApp}
+                  disabled={!isReady} // ★
+                >
+                  WhatsApp/SMS
+                </Button>
+              </Tooltip>
             </Col>
 
             <Col>
-              <Button type="primary" onClick={handlePreService}>
-                Pre-service
-              </Button>
+              <Tooltip title={isReady ? "" : (notReadyWhy || "Fill all required fields")} placement="top">
+                <Button type="primary" onClick={handlePreService} disabled={!isReady} /* ★ */>
+                  Pre-service
+                </Button>
+              </Tooltip>
             </Col>
 
             <Col>
+              {/* Post-service print intentionally not gated; it prints current values */}
               <Button onClick={() => handlePrint("post")}>
                 Post-service
               </Button>
