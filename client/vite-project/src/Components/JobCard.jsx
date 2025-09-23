@@ -65,7 +65,7 @@ const BRANCHES = [
 
 const EXECUTIVES = [
   { name: "Rukmini",  phone: "9901678562" },
-  { name: "Meghana",  phone: "7019974219" },
+  { name: "Meghana",  phone: "9741609799" },
   { name: "Shubha",   phone: "8971585057" },
   { name: "Rani",     phone: "9108970455" },
   { name: "Likhitha",  phone: "9535190015" },
