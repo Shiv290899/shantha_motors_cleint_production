@@ -146,7 +146,8 @@ img { max-width: 100%; height: auto; background: transparent; }
                   <>
                     <div className="en">NH Motors | ಎನ್ ಎಚ್ ಮೋಟರ್ಸ್</div>
                     <div className="shop-sub" style={{ marginTop: 4 }}>
-                      Site No. 116/1, Bydarahalli, Magadi Main Road, Opp. HP Petrol Bunk, Bangalore - 560091
+                       Site No. 116/1, Bydarahalli, Magadi Main Road, Opp.<br />
+                      HP Petrol Bunk, Bangalore - 560091
                     </div>
                     <div className="shop-sub">Mob: 9731366921 / 8073283502 / 9741609799</div>
                   </>
